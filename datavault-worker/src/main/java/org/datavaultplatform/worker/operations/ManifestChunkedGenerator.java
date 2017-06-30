@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 public class ManifestChunkedGenerator implements ManifestGenerator {
 
+	private static final int FILE_LIST_CHUNK_SIZE = 1;
 	private static final Logger logger = LoggerFactory.getLogger(ManifestChunkedGenerator.class);
 
 	@Override
@@ -52,7 +53,7 @@ public class ManifestChunkedGenerator implements ManifestGenerator {
 					fileDetailsList.add(fileDetails);
 				}
 				
-				if (fileDetailsList.size() == 1) {
+				if (fileDetailsList.size() == FILE_LIST_CHUNK_SIZE) {
 					writeListToFile(bagDirectory, manifestFile, fileDetailsList);
 				}
 			}
