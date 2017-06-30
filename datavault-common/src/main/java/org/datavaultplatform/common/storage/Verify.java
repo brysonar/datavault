@@ -6,14 +6,14 @@ import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 
 public class Verify {
     
-    private static final String algorithm = "SHA-1";
+    private static final CheckSumEnum algorithm = CheckSumEnum.SHA1;
     
     public enum Method {LOCAL_ONLY, COPY_BACK};
     
     public static String getDigest(File file) {
 
     	try {
-        MessageDigest sha1 = MessageDigest.getInstance(algorithm);
+        MessageDigest sha1 = MessageDigest.getInstance(algorithm.getJavaSecurityAlgorithm());
         
         try (InputStream is = new FileInputStream(file)) {
             byte[] buffer = new byte[8192];
@@ -32,6 +32,10 @@ public class Verify {
     }
     
     public static String getAlgorithm() {
+        return algorithm.getJavaSecurityAlgorithm();
+    }
+    
+    public static CheckSumEnum getAlgorithmCheckSum() {
         return algorithm;
     }
 

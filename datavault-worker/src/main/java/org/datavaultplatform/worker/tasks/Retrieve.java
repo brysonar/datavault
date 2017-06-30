@@ -55,7 +55,6 @@ public class Retrieve implements ITaskAction {
         String userID = properties.get("userId");
         String archiveDigest = properties.get("archiveDigest");
         String archiveDigestAlgorithm = properties.get("archiveDigestAlgorithm");
-        
         long archiveSize = Long.parseLong(properties.get("archiveSize"));
 
         if (task.isRedeliver()) {
@@ -64,12 +63,8 @@ public class Retrieve implements ITaskAction {
             return;
         }
         
-        ArrayList<String> states = new ArrayList<>();
-        states.add("Computing free space");    // 0
-        states.add("Retrieving from archive"); // 1
-        states.add("Validating data");         // 2
-        states.add("Transferring files");      // 3
-        states.add("Data retrieve complete");  // 4
+        ArrayList<String> states = buildStates();
+        
         eventStream.send(new InitStates(task.getJobID(), depositId, states)
             .withUserId(userID));
         
@@ -185,7 +180,7 @@ public class Retrieve implements ITaskAction {
             long bagDirSize = FileUtils.sizeOfDirectory(bagDir);
             
             // Validate the bagit directory
-            if (!packager.validateBag(bagDir)) {
+            if (!packager.validateBag(bagDir.toPath())) {
                 throw new Exception("Bag is invalid");
             }
             
@@ -232,4 +227,15 @@ public class Retrieve implements ITaskAction {
                 .withUserId(userID));
         }
     }
+
+
+	private ArrayList<String> buildStates() {
+		ArrayList<String> states = new ArrayList<>();
+        states.add("Computing free space");    // 0
+        states.add("Retrieving from archive"); // 1
+        states.add("Validating data");         // 2
+        states.add("Transferring files");      // 3
+        states.add("Data retrieve complete");  // 4
+		return states;
+	}
 }

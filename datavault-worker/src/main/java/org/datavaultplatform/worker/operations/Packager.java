@@ -8,7 +8,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import org.apache.commons.io.FileUtils;
+import org.datavaultplatform.common.storage.CheckSumEnum;
 import org.datavaultplatform.worker.util.ChecksumUtil;
+import org.datavaultplatform.worker.util.DataVaultConstants;
+import org.datavaultplatform.worker.util.FileWriterUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,10 +56,10 @@ public class Packager implements IPackager {
     
     // Validate an existing bag
     @Override
-    public boolean validateBag(File dir)  {
+    public  boolean validateBag(Path bagDirectory) {
 
         BagFactory bagFactory = new BagFactory();
-        Bag bag = bagFactory.createBag(dir);
+        Bag bag = bagFactory.createBag(bagDirectory.toFile());
         
         boolean result = false;
         try {
@@ -173,4 +176,11 @@ public class Packager implements IPackager {
         
         return result;
     }
+    
+	@Override
+	public void addTarfileChecksum(Path bagDirectory, String tarHash, CheckSumEnum tarHashAlgorithm) {
+		
+		File tagManifestFile = bagDirectory.resolve(DataVaultConstants.TAG_MANIFEST_FILE).toFile();
+		FileWriterUtil.writeToFile(tagManifestFile, tarHash + "," + DataVaultConstants.TAG_MANIFEST_FILE + "," + tarHashAlgorithm.getJavaSecurityAlgorithm() + DataVaultConstants.NEW_LINE);
+	}
 }

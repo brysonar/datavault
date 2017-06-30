@@ -10,7 +10,7 @@ import java.security.MessageDigest;
 
 import javax.xml.bind.DatatypeConverter;
 
-import org.datavaultplatform.worker.operations.CheckSumEnum;
+import org.datavaultplatform.common.storage.CheckSumEnum;
 
 import com.amazonaws.util.Md5Utils;
 

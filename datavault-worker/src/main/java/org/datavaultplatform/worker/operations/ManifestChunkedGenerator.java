@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.datavaultplatform.common.storage.CheckSumEnum;
 import org.datavaultplatform.worker.model.FileDetails;
 import org.datavaultplatform.worker.util.ChecksumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
@@ -55,6 +56,7 @@ public class ManifestChunkedGenerator implements ManifestGenerator {
 				
 				if (fileDetailsList.size() == FILE_LIST_CHUNK_SIZE) {
 					writeListToFile(bagDirectory, manifestFile, fileDetailsList);
+					fileDetailsList.clear();
 				}
 			}
 		} catch (IOException e) {

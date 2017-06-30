@@ -6,6 +6,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.datavaultplatform.common.storage.CheckSumEnum;
 import org.datavaultplatform.worker.model.FileDetails;
 import org.datavaultplatform.worker.util.ChecksumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
@@ -35,9 +36,9 @@ public class ManifestSingleLineGenerator implements ManifestGenerator {
 		return manifestPath;
 	}
 
-	private void listFiles(final Path path, final Path bagDirectory, File manifestFile) {
+	private void listFiles(final Path dataDirectory, final Path bagDirectory, File manifestFile) {
 		
-		try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
+		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dataDirectory)) {
 			for (Path file : stream) {
 				if (Files.isDirectory(file)) {
 					listFiles(file, bagDirectory, manifestFile);
