@@ -1,5 +1,7 @@
 package org.datavaultplatform.worker.util;
 
+import org.datavaultplatform.worker.operations.CheckSumEnum;
+
 public class DataVaultConstants {
 
 	public static final boolean doTempDirectoryCleanUp = true;
@@ -8,5 +10,5 @@ public class DataVaultConstants {
 	public static final String TAG_MANIFEST_FILE = "tagmanifest.txt";
 	public static final String NEW_LINE = "\n";
 	
-
+	public static final CheckSumEnum checkSumEnum = CheckSumEnum.MD5;
 }

@@ -35,7 +35,12 @@
 
 	<bean id="packager" class="org.datavaultplatform.worker.operations.MyPackager" />
 
- 	<bean id="manifestGenerator" class="org.datavaultplatform.worker.operations.ManifestGenerator" />
+
+ 	<bean id="manifestGenerator" class="org.datavaultplatform.worker.operations.ManifestChunkedGenerator" />
+
+ 	<!-- 
+    <bean id="manifestGenerator" class="org.datavaultplatform.worker.operations.ManifestSingleLineGenerator" />
+ -->
  
      <bean id="retrieve" class="org.datavaultplatform.worker.tasks.Retrieve" />
 

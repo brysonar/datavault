@@ -25,11 +25,19 @@ public final class ChecksumUtil {
 //  Algorithm algorithm = Algorithm.MD5;
 //	String checksum = MessageDigestHelper.generateFixity(bagFile.newInputStream(), algorithm);
 
-	public static String generateCheckSum2(Path path, CheckSumEnum alg) {
-		return generateCheckSum(path, alg);
+	public static String generateCheckSum(Path path, CheckSumEnum alg) {
+		return generateCheckSumAws(path, alg);
 	}
 	
-	public static String generateCheckSum2(File file, CheckSumEnum alg) {
+	public static String generateCheckSum(File file, CheckSumEnum alg) {
+		return generateCheckSum(file.toPath(), alg);
+	}
+	
+	private static String generateCheckSum2(Path path, CheckSumEnum alg) {
+		return generateCheckSum2(path.toFile(), alg);
+	}
+	
+	private static String generateCheckSum2(File file, CheckSumEnum alg) {
 
 		String hash = null;
 		try (FileInputStream fis = new FileInputStream(file)) {
@@ -49,7 +57,7 @@ public final class ChecksumUtil {
 		return hash;
 	}
 
-	public static String generateCheckSum(Path path, CheckSumEnum alg) {
+	private static String generateCheckSumAws(Path path, CheckSumEnum alg) {
 		String checksum = null;
 		try {
 			if (alg == CheckSumEnum.MD5) {
@@ -62,7 +70,7 @@ public final class ChecksumUtil {
 		return checksum;
 	}
 	
-	public static String generateCheckSum3(Path path, CheckSumEnum alg) {
+	private static String generateCheckSum3(Path path, CheckSumEnum alg) {
 		String checksum = null;
 		try {
 			byte[] b = Files.readAllBytes(path);
