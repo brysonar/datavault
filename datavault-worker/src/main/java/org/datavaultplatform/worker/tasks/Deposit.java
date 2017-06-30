@@ -36,6 +36,7 @@ import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.Identifier;
 import org.datavaultplatform.worker.operations.ProgressTracker;
 import org.datavaultplatform.worker.operations.Tar;
+import org.datavaultplatform.worker.util.DataVaultConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,7 +52,7 @@ public class Deposit implements ITaskAction{
 	private final IPackager packager;
 	private final EventStream eventStream;
 
-	private boolean doDelete = false;
+
 	
 
 	@Autowired
@@ -145,7 +146,7 @@ public class Deposit implements ITaskAction{
 		String archiveId = copyTarToArchiveStorage(storage.getArchiveFs(), depositDetails, tarFile);
 
 		//TODO there is multiple deletes of this directory - see verify archive
-		if (doDelete) {
+		if (DataVaultConstants.doTempDirectoryCleanUp) {
 			deleteDirectory(tempBagDataPath.toFile());
 		}
 		
@@ -446,7 +447,7 @@ public class Deposit implements ITaskAction{
 
 			// Cleanup
 			logger.info("Cleaning up ...");
-			if (doDelete) {
+			if (DataVaultConstants.doTempDirectoryCleanUp) {
 				FileUtils.deleteDirectory(bagDir);
 			}
 			tarFile.delete();

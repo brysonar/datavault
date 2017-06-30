@@ -11,6 +11,7 @@ import org.datavaultplatform.common.task.Task;
 import org.datavaultplatform.worker.WorkerInstance;
 import org.datavaultplatform.worker.exception.DataVaultWorkerException;
 import org.datavaultplatform.worker.tasks.ITaskAction;
+import org.datavaultplatform.worker.util.DataVaultConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,7 +52,9 @@ public class Receiver {
 			taskAction.performAction(context, task);
 			
 			//TODO this will not be deleted if an earlier exception has been thrown
-			//deleteTempDirectory(tempDirPath);
+			if (DataVaultConstants.doTempDirectoryCleanUp) {
+				deleteTempDirectory(tempDirPath);
+			}
 
 		} catch (RuntimeException e) {
 			logger.error("Error decoding message: " + e.getMessage(), e);
