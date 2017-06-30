@@ -1,45 +1,52 @@
 package org.datavaultplatform.worker.tasks;
 
-import java.util.Map;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import org.apache.commons.io.FileUtils;
+import java.util.Map;
 
-import org.datavaultplatform.common.event.retrieve.RetrieveComplete;
-import org.datavaultplatform.common.event.retrieve.RetrieveStart;
-import org.datavaultplatform.common.task.Context;
-import org.datavaultplatform.common.task.Task;
-import org.datavaultplatform.worker.queue.EventSender;
+import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.event.Error;
+import org.datavaultplatform.common.event.EventStream;
 import org.datavaultplatform.common.event.InitStates;
 import org.datavaultplatform.common.event.UpdateProgress;
-
+import org.datavaultplatform.common.event.retrieve.RetrieveComplete;
+import org.datavaultplatform.common.event.retrieve.RetrieveStart;
 import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.storage.Device;
 import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.storage.Verify;
+import org.datavaultplatform.common.task.Context;
+import org.datavaultplatform.common.task.Task;
+import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.ProgressTracker;
 import org.datavaultplatform.worker.operations.Tar;
-import org.datavaultplatform.worker.operations.Packager;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
-public class Retrieve extends Task {
+public class Retrieve implements ITaskAction {
     
     private static final Logger logger = LoggerFactory.getLogger(Retrieve.class);
     
+	private final IPackager packager;
+	private final EventStream eventStream;
+	
+	@Autowired
+	public Retrieve(IPackager packager, EventStream eventStream) {
+		super();
+		this.packager = packager;
+		this.eventStream = eventStream;
+	}
+
+	
     @Override
-    public void performAction(Context context) {
-        
-        EventSender eventStream = (EventSender)context.getEventStream();
+    public void performAction(Context context, Task task) {
         
         logger.info("Retrieve job - performAction()");
         
-        Map<String, String> properties = getProperties();
+        Map<String, String> properties = task.getProperties();
         String depositId = properties.get("depositId");
         String retrieveId = properties.get("retrieveId");
         String bagID = properties.get("bagId");
@@ -51,8 +58,8 @@ public class Retrieve extends Task {
         
         long archiveSize = Long.parseLong(properties.get("archiveSize"));
 
-        if (this.isRedeliver()) {
-            eventStream.send(new Error(jobID, depositId, "Retrieve stopped: the message had been redelivered, please investigate")
+        if (task.isRedeliver()) {
+            eventStream.send(new Error(task.getJobID(), depositId, "Retrieve stopped: the message had been redelivered, please investigate")
                 .withUserId(userID));
             return;
         }
@@ -63,10 +70,10 @@ public class Retrieve extends Task {
         states.add("Validating data");         // 2
         states.add("Transferring files");      // 3
         states.add("Data retrieve complete");  // 4
-        eventStream.send(new InitStates(jobID, depositId, states)
+        eventStream.send(new InitStates(task.getJobID(), depositId, states)
             .withUserId(userID));
         
-        eventStream.send(new RetrieveStart(jobID, depositId, retrieveId)
+        eventStream.send(new RetrieveStart(task.getJobID(), depositId, retrieveId)
             .withUserId(userID)
             .withNextState(0));
         
@@ -79,29 +86,29 @@ public class Retrieve extends Task {
         
         // Connect to the user storage
         try {
-            Class<?> clazz = Class.forName(userFileStore.getStorageClass());
+            Class<?> clazz = Class.forName(task.getUserFileStore().getStorageClass());
             Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
-            Object instance = constructor.newInstance(userFileStore.getStorageClass(), userFileStore.getProperties());
+            Object instance = constructor.newInstance(task.getUserFileStore().getStorageClass(), task.getUserFileStore().getProperties());
             userFs = (Device)instance;
             userStore = (UserStore)userFs;
         } catch (Exception e) {
             String msg = "Retrieve failed: could not access active filesystem";
             logger.error(msg, e);
-            eventStream.send(new Error(jobID, depositId, msg)
+            eventStream.send(new Error(task.getJobID(), depositId, msg)
                 .withUserId(userID));
             return;
         }
         
         // Connect to the archive storage
         try {
-            Class<?> clazz = Class.forName(archiveFileStore.getStorageClass());
+            Class<?> clazz = Class.forName(task.getArchiveFileStore().getStorageClass());
             Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
-            Object instance = constructor.newInstance(archiveFileStore.getStorageClass(), archiveFileStore.getProperties());
+            Object instance = constructor.newInstance(task.getArchiveFileStore().getStorageClass(), task.getArchiveFileStore().getProperties());
             archiveFs = (Device)instance;
         } catch (Exception e) {
             String msg = "Retrieve failed: could not access archive filesystem";
             logger.error(msg, e);
-            eventStream.send(new Error(jobID, depositId, msg)
+            eventStream.send(new Error(task.getJobID(), depositId, msg)
                 .withUserId(userID));
             return;
         }
@@ -117,13 +124,13 @@ public class Retrieve extends Task {
                 long freespace = userFs.getUsableSpace();
                 logger.info("Free space: " + freespace + " bytes (" +  FileUtils.byteCountToDisplaySize(freespace) + ")");
                 if (freespace < archiveSize) {
-                    eventStream.send(new Error(jobID, depositId, "Not enough free space to retrieve data!")
+                    eventStream.send(new Error(task.getJobID(), depositId, "Not enough free space to retrieve data!")
                         .withUserId(userID));
                     return;
                 }
             } catch (Exception e) {
                 logger.info("Unable to determine free space");
-                eventStream.send(new Error(jobID, depositId, "Unable to determine free space")
+                eventStream.send(new Error(task.getJobID(), depositId, "Unable to determine free space")
                     .withUserId(userID));
             }
 
@@ -134,13 +141,13 @@ public class Retrieve extends Task {
             Path tarPath = context.getTempDir().resolve(tarFileName);
             File tarFile = tarPath.toFile();
             
-            eventStream.send(new UpdateProgress(jobID, depositId, 0, archiveSize, "Starting transfer ...")
+            eventStream.send(new UpdateProgress(task.getJobID(), depositId, 0, archiveSize, "Starting transfer ...")
                 .withUserId(userID)
                 .withNextState(1));
             
             // Progress tracking (threaded)
             Progress progress = new Progress();
-            ProgressTracker tracker = new ProgressTracker(progress, jobID, depositId, archiveSize, eventStream);
+            ProgressTracker tracker = new ProgressTracker(progress, task.getJobID(), depositId, archiveSize, eventStream);
             Thread trackerThread = new Thread(tracker);
             trackerThread.start();
 
@@ -156,7 +163,7 @@ public class Retrieve extends Task {
             logger.info("Copied: " + progress.dirCount + " directories, " + progress.fileCount + " files, " + progress.byteCount + " bytes");
             
             logger.info("Validating data ...");
-            eventStream.send(new UpdateProgress(jobID, depositId).withNextState(2)
+            eventStream.send(new UpdateProgress(task.getJobID(), depositId).withNextState(2)
                 .withUserId(userID));
             
             // Verify integrity with deposit checksum
@@ -178,7 +185,7 @@ public class Retrieve extends Task {
             long bagDirSize = FileUtils.sizeOfDirectory(bagDir);
             
             // Validate the bagit directory
-            if (!Packager.validateBag(bagDir)) {
+            if (!packager.validateBag(bagDir)) {
                 throw new Exception("Bag is invalid");
             }
             
@@ -188,13 +195,13 @@ public class Retrieve extends Task {
             
             // Copy the extracted files to the target retrieve area
             logger.info("Copying to user directory ...");
-            eventStream.send(new UpdateProgress(jobID, depositId, 0, bagDirSize, "Starting transfer ...")
+            eventStream.send(new UpdateProgress(task.getJobID(), depositId, 0, bagDirSize, "Starting transfer ...")
                 .withUserId(userID)
                 .withNextState(3));
             
             // Progress tracking (threaded)
             progress = new Progress();
-            tracker = new ProgressTracker(progress, jobID, depositId, bagDirSize, eventStream);
+            tracker = new ProgressTracker(progress, task.getJobID(), depositId, bagDirSize, eventStream);
             trackerThread = new Thread(tracker);
             trackerThread.start();
             
@@ -215,13 +222,13 @@ public class Retrieve extends Task {
             tarFile.delete();
             
             logger.info("Data retrieve complete: " + retrievePath);
-            eventStream.send(new RetrieveComplete(jobID, depositId, retrieveId).withNextState(4)
+            eventStream.send(new RetrieveComplete(task.getJobID(), depositId, retrieveId).withNextState(4)
                 .withUserId(userID));
             
         } catch (Exception e) {
             String msg = "Data retrieve failed: " + e.getMessage();
             logger.error(msg, e);
-            eventStream.send(new Error(jobID, depositId, msg)
+            eventStream.send(new Error(task.getJobID(), depositId, msg)
                 .withUserId(userID));
         }
     }

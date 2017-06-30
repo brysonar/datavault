@@ -1,11 +1,13 @@
 package org.datavaultplatform.common.task;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import java.util.Map;
-import org.datavaultplatform.common.model.FileStore;
+
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.datavaultplatform.common.model.ArchiveStore;
+import org.datavaultplatform.common.model.FileStore;
 import org.datavaultplatform.common.model.Job;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 // A generic task container
 
@@ -21,6 +23,7 @@ public class Task {
     private boolean isRedeliver;
 
     public Task() {};
+    
     public Task(Job job,
                 Map<String, String> properties,
                 FileStore userFileStore,
@@ -32,6 +35,11 @@ public class Task {
         this.archiveFileStore = archiveFileStore;
     }
 
+    @Override
+    public String toString() {
+    	   return ReflectionToStringBuilder.toString(this);
+    }
+    
     public String getJobID() { return jobID; }
 
     public void setJobID(String jobID) { this.jobID = jobID; }
@@ -76,5 +84,4 @@ public class Task {
         this.isRedeliver = isRedeliver;
     }
     
-    public void performAction(Context context) {}
 }

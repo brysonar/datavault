@@ -1,10 +1,9 @@
 package org.datavaultplatform.worker.operations;
 
 import org.apache.commons.io.FileUtils;
+import org.datavaultplatform.common.event.EventStream;
 import org.datavaultplatform.common.event.UpdateProgress;
 import org.datavaultplatform.common.io.Progress;
-import org.datavaultplatform.worker.queue.EventSender;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,16 +17,16 @@ public class ProgressTracker implements Runnable {
     Progress progress;
     String jobId;
     String depositId;
-    EventSender eventSender;
+    EventStream eventStream;
     
     private static final Logger logger = LoggerFactory.getLogger(ProgressTracker.class);
     
-    public ProgressTracker(Progress progress, String jobId, String depositId, long expectedBytes, EventSender eventSender) {
+    public ProgressTracker(Progress progress, String jobId, String depositId, long expectedBytes, EventStream eventStream) {
         this.progress = progress;
         this.jobId = jobId;
         this.depositId = depositId;
         this.expectedBytes = expectedBytes;
-        this.eventSender = eventSender;
+        this.eventStream = eventStream;
     }
     
     public void stop() {
@@ -64,7 +63,7 @@ public class ProgressTracker implements Runnable {
             
             UpdateProgress updateState = new UpdateProgress(jobId, depositId, byteCount, expectedBytes, message);
             lastByteCount = byteCount;
-            eventSender.send(updateState);
+            eventStream.send(updateState);
         }
     }
     

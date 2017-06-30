@@ -10,8 +10,8 @@
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.7</maven.compiler.source>
-        <maven.compiler.target>1.7</maven.compiler.target>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
         <!-- This is the path to the root directory. -->
         <root.basedir>${basedir}/..</root.basedir>
     </properties>
@@ -100,7 +100,13 @@
             <artifactId>datavault-common</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
-
+<!-- 
+<dependency>
+    <groupId>fast-md5</groupId>
+    <artifactId>fast-md5</artifactId>
+    <version>2.5</version>
+</dependency>
+ -->
     </dependencies>
 
     <build>

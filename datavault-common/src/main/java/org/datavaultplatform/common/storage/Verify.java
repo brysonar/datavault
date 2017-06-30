@@ -10,8 +10,9 @@ public class Verify {
     
     public enum Method {LOCAL_ONLY, COPY_BACK};
     
-    public static String getDigest(File file) throws Exception {
+    public static String getDigest(File file) {
 
+    	try {
         MessageDigest sha1 = MessageDigest.getInstance(algorithm);
         
         try (InputStream is = new FileInputStream(file)) {
@@ -25,6 +26,9 @@ public class Verify {
             
             return new HexBinaryAdapter().marshal(sha1.digest());
         }
+    	} catch (Exception e) {
+    		throw new RuntimeException(e);
+    	}
     }
     
     public static String getAlgorithm() {

@@ -1,11 +1,5 @@
 package org.datavaultplatform.common.storage.impl;
 
-import org.datavaultplatform.common.storage.Device;
-import org.datavaultplatform.common.storage.UserStore;
-import org.datavaultplatform.common.storage.ArchiveStore;
-import org.datavaultplatform.common.model.FileInfo;
-import org.datavaultplatform.common.io.Progress;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -13,16 +7,25 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.io.FileCopy;
+import org.datavaultplatform.common.io.Progress;
+import org.datavaultplatform.common.model.FileInfo;
+import org.datavaultplatform.common.storage.ArchiveStore;
+import org.datavaultplatform.common.storage.Device;
+import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.storage.Verify;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
 
+	 private static final Logger logger = LoggerFactory.getLogger(LocalFileSystem.class);
+	 
     private String rootPath = null;
     
     public LocalFileSystem(String name, Map<String,String> config) throws FileNotFoundException {
@@ -88,7 +91,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
     }
     
     @Override
-    public long getSize(String path) throws Exception {
+    public long getSize(String path) {
         Path absolutePath = getAbsolutePath(path);
         File file = absolutePath.toFile();
         
@@ -100,7 +103,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
     }
 
     @Override
-    public boolean isDirectory(String path) throws Exception {
+    public boolean isDirectory(String path) {
         Path absolutePath = getAbsolutePath(path);
         File file = absolutePath.toFile();
         return file.isDirectory();
@@ -121,18 +124,26 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
 
     @Override
     public void retrieve(String path, File working, Progress progress) throws Exception {
+    	
+    	logger.debug("Local File System retrieve - path: {}", path);
+    	
         Path absolutePath = getAbsolutePath(path);
         File file = absolutePath.toFile();
         
         if (file.isFile()) {
+        	logger.debug("Local File System retrieve - copying file: {}", file.getAbsolutePath());
             FileCopy.copyFile(progress, file, working);
         } else if (file.isDirectory()) {
+        	logger.debug("Local File System retrieve - copying directory: {}", file.getAbsolutePath());
             FileCopy.copyDirectory(progress, file, working);
         }
     }
 
     @Override
     public String store(String path, File working, Progress progress) throws Exception {
+    	
+    	logger.debug("Local File System store - path: {}", path);
+    	
         Path absolutePath = getAbsolutePath(path);
         File retrieveFile = absolutePath.resolve(working.getName()).toFile();
         

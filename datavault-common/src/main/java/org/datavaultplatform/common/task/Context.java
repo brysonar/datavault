@@ -12,6 +12,7 @@ public class Context {
     private EventStream eventStream;
     
     public Context() {};
+    
     public Context(Path tempDir, Path metaDir, EventStream eventStream) {
         this.tempDir = tempDir;
         this.metaDir = metaDir;

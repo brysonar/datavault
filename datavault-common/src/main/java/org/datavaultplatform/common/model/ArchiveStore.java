@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import javax.persistence.*;
 
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.hibernate.annotations.GenericGenerator;
 
 import java.util.HashMap;
@@ -34,12 +35,18 @@ public class ArchiveStore {
     private HashMap<String,String> properties;
     
     public ArchiveStore() {}
+    
     public ArchiveStore(String storageClass, HashMap<String,String> properties, String label) {
         this.storageClass = storageClass;
         this.properties = properties;
         this.label = label;
     }
 
+    @Override
+    public String toString() {
+    	   return ReflectionToStringBuilder.toString(this);
+    }
+    
     public String getID() { return id; }
 
     public String getStorageClass() { return storageClass; }

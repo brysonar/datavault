@@ -30,10 +30,14 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.io.*;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FileCopy {
 
+	 private static final Logger logger = LoggerFactory.getLogger(FileCopy.class);
+	 
     /**
      * Instances should NOT be constructed in standard programming.
      */
@@ -209,7 +213,10 @@ public class FileCopy {
      * @throws IOException if an error occurs
      */
     private static void doCopyFile(Progress progress, File srcFile, File destFile, boolean preserveFileDate) throws IOException {
-        if (destFile.exists() && destFile.isDirectory()) {
+        
+    	logger.debug("Doing doCopyFile - source: {}, destination: {}", srcFile.getAbsolutePath(), destFile.getAbsolutePath());
+    	
+    	if (destFile.exists() && destFile.isDirectory()) {
             throw new IOException("Destination '" + destFile + "' exists but is a directory");
         }
 
@@ -243,11 +250,15 @@ public class FileCopy {
             throw new IOException("Failed to copy full contents from '" +
                     srcFile + "' to '" + destFile + "'");
         }
+        
         if (preserveFileDate) {
             destFile.setLastModified(srcFile.lastModified());
         }
         
         progress.fileCount += 1;
+        
+        logger.debug("Completed doCopyFile - source: {}, destination: {}", srcFile.getAbsolutePath(), destFile.getAbsolutePath());
+    	
     }
 
     //-----------------------------------------------------------------------

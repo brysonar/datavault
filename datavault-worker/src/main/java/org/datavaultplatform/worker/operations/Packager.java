@@ -2,18 +2,25 @@ package org.datavaultplatform.worker.operations;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.FileInputStream;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
 import org.apache.commons.io.FileUtils;
-import gov.loc.repository.bagit.*;
+import org.datavaultplatform.worker.util.ChecksumUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import gov.loc.repository.bagit.Bag;
+import gov.loc.repository.bagit.BagFactory;
 import gov.loc.repository.bagit.Manifest.Algorithm;
-import java.io.FileNotFoundException;
+import gov.loc.repository.bagit.PreBag;
 
-public class Packager {
+public class Packager implements IPackager {
 
+	private static final Logger logger = LoggerFactory.getLogger(Packager.class);
+	
     public static final String metadataDirName = "metadata";
     
     public static final String depositMetaFileName = "deposit.json";
@@ -22,24 +29,31 @@ public class Packager {
     public static final String externalMetaFileName = "external.txt";
     
     // Create a bag from an existing directory.
-    public static boolean createBag(File dir) throws Exception {
+    public boolean createBag(Path bagDirectory, Path dataDirectory)  {
 
+    	logger.info("Creating bag ...");
+    	
         BagFactory bagFactory = new BagFactory();
-        PreBag preBag = bagFactory.createPreBag(dir);
+        PreBag preBag = bagFactory.createPreBag(bagDirectory.toFile());
         Bag bag = preBag.makeBagInPlace(BagFactory.LATEST, false);
         
         boolean result = false;
         try {
             result = bag.verifyValid().isSuccess();
         } finally {
-            bag.close();
+            try {
+				bag.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
         }
         
         return result;
     }
     
     // Validate an existing bag
-    public static boolean validateBag(File dir) throws Exception {
+    @Override
+    public boolean validateBag(File dir)  {
 
         BagFactory bagFactory = new BagFactory();
         Bag bag = bagFactory.createBag(dir);
@@ -48,14 +62,19 @@ public class Packager {
         try {
             result = bag.verifyValid().isSuccess();
         } finally {
-            bag.close();
+            try {
+				bag.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
         }
         
         return result;
     }
     
     // Add vault/deposit metadata
-    public static boolean addMetadata(File bagDir,
+    @Override
+    public boolean addMetadata(File bagDir,
                                       String depositMetadata,
                                       String vaultMetadata,
                                       String fileTypeMetadata,
@@ -94,37 +113,18 @@ public class Packager {
     
     // Add a metadata file to the bag metadata directory
     // Also adds tag information to the tag manifest
-    public static boolean addMetaFile(File tagManifest, Path metadataDirPath, String metadataFileName, String metadata, Algorithm alg) throws IOException {
+    private void addMetaFile(File tagManifest, Path metadataDirPath, String metadataFileName, String metadata, Algorithm alg) throws IOException {
         
         File metadataFile = metadataDirPath.resolve(metadataFileName).toFile();
         FileUtils.writeStringToFile(metadataFile, metadata);
-        String hash = computeFileHash(metadataFile, alg);
+        String hash = ChecksumUtil.computeFileHash(metadataFile, alg);
         FileUtils.writeStringToFile(tagManifest, hash + "  " + metadataDirName + "/" + metadataFileName + "\r\n", true);
-        
-        return true;
     }
     
-    // Compute a hash value for file contents
-    public static String computeFileHash(File file, Algorithm alg) throws FileNotFoundException, IOException {
-        String hash = null;
-        FileInputStream fis = new FileInputStream(file);
-
-        if (alg == Algorithm.MD5) {
-            hash = org.apache.commons.codec.digest.DigestUtils.md5Hex(fis);
-        } else if (alg == Algorithm.SHA1) {
-            hash = org.apache.commons.codec.digest.DigestUtils.sha1Hex(fis);
-        } else if (alg == Algorithm.SHA256) {
-            hash = org.apache.commons.codec.digest.DigestUtils.sha256Hex(fis);
-        } else if (alg == Algorithm.SHA512) {
-            hash = org.apache.commons.codec.digest.DigestUtils.sha512Hex(fis);
-        }
-        
-        fis.close();
-        return hash;
-    }
     
     // Extract the top-level metadata files from a bag and copy to a new directory.
-    public static boolean extractMetadata(File bagDir, File metaDir) {
+    @Override
+    public boolean extractMetadata(File bagDir, File metaDir) {
         
         // TODO: could we use the built-in "holey" bag methods instead?
         

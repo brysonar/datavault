@@ -1,117 +1,82 @@
 package org.datavaultplatform.worker.queue;
 
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.QueueingConsumer;
+import java.io.File;
 import java.io.IOException;
-import java.nio.file.*;
-import java.util.concurrent.TimeoutException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.io.FileUtils;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
-import org.datavaultplatform.common.task.Task;
+import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.task.Context;
+import org.datavaultplatform.common.task.Task;
 import org.datavaultplatform.worker.WorkerInstance;
+import org.datavaultplatform.worker.exception.DataVaultWorkerException;
+import org.datavaultplatform.worker.tasks.ITaskAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 public class Receiver {
 
-    private static final Logger logger = LoggerFactory.getLogger(Receiver.class);
-    
-    private String queueServer;
-    private String queueName;
-    private String queueUser;
-    private String queuePassword;
+	private final Logger logger = LoggerFactory.getLogger(this.getClass());
+
+	@Autowired
+	private TaskBuilder taskBuilder;
+
+	@Autowired
+	private TaskFactory taskFactory;
+	
+	@Value("${tempDir}")
     private String tempDir;
-    private String metaDir;
-
-    public void setQueueServer(String queueServer) {
-        this.queueServer = queueServer;
-    }
-
-    public void setQueueName(String queueName) {
-        this.queueName = queueName;
-    }
-
-    public void setQueueUser(String queueUser) {
-        this.queueUser = queueUser;
-    }
-
-    public void setQueuePassword(String queuePassword) {
-        this.queuePassword = queuePassword;
-    }
-
-    public void setTempDir(String tempDir) {
-        this.tempDir = tempDir;
-    }
+	
+	@Value("${metaDir}")
+	private String metaDir;
     
-    public void setMetaDir(String metaDir) {
-        this.metaDir = metaDir;
-    }
+	public void process(String message, boolean isRedeliver) {
+		
+		logger.debug("Received message: {}", message);
+		 
+		try {
+			Task task = taskBuilder.build(message, isRedeliver);
+			ITaskAction taskAction = taskFactory.getTaskAction(task);
+			
+			Path tempDirPath = getTempDirPath();
+			createTempDirectory(tempDirPath);
 
-    public void receive(EventSender events) throws IOException, InterruptedException, TimeoutException {
+			Path metaDirPath = Paths.get(metaDir);
+			logger.debug("Meta Directory: {}", metaDirPath.toFile().getAbsolutePath());
 
-        ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost(queueServer);
-        factory.setUsername(queueUser);
-        factory.setPassword(queuePassword);
-        
-        Connection connection = factory.newConnection();
-        Channel channel = connection.createChannel();
+			Context context = new Context(tempDirPath, metaDirPath, null);
 
-        channel.queueDeclare(queueName, false, false, false, null);
-        logger.info("Waiting for messages");
-        
-        QueueingConsumer consumer = new QueueingConsumer(channel);
+			taskAction.performAction(context, task);
+			
+			//TODO this will not be deleted if an earlier exception has been thrown
+			//deleteTempDirectory(tempDirPath);
 
-        channel.basicQos(1);
-        channel.basicConsume(queueName, false, consumer);
+		} catch (RuntimeException e) {
+			logger.error("Error decoding message: " + e.getMessage(), e);
+		}
+	}
 
-        while (true) {
-            QueueingConsumer.Delivery delivery = consumer.nextDelivery();
-            String message = new String(delivery.getBody());
-            
-            // Note that the message body might contain keys/credentials
-            logger.debug("Received " + message.length() + " bytes");
-            logger.debug("Received message body '" + message + "'");
-            
-            // Decode and begin the job ...
-            
-            try {
-                ObjectMapper mapper = new ObjectMapper();
-                Task commonTask = mapper.readValue(message, Task.class);
-                
-                Class<?> clazz = Class.forName(commonTask.getTaskClass());
-                Task concreteTask = (Task)(mapper.readValue(message, clazz));
+	private Path getTempDirPath() {
+		Path tempDirPath = Paths.get(tempDir, WorkerInstance.getWorkerName());
+		return tempDirPath;
+	}
 
-                // Is the message a redelivery?
-                if (delivery.getEnvelope().isRedeliver()) {
-                    concreteTask.setIsRedeliver(true);
-                }
+	private void createTempDirectory(Path tempDirPath) {
+		logger.debug("Creating Temp Directory: {}", tempDirPath.toString());
+		File tempDirectory = tempDirPath.toFile();
+		tempDirectory.mkdir();
+		// TODO throw exception if directory not created
+	}
 
-                // Set up the worker temporary directory
-                Path tempDirPath = Paths.get(tempDir, WorkerInstance.getWorkerName());
-                tempDirPath.toFile().mkdir();
-                
-                Path metaDirPath = Paths.get(metaDir);
-                
-                Context context = new Context(tempDirPath, metaDirPath, events);
-                concreteTask.performAction(context);
-                
-                // Clean up the temporary directory
-                FileUtils.deleteDirectory(tempDirPath.toFile());
-                
-            } catch (Exception e) {
-                logger.error("Error decoding message", e);
-            }
+	private void deleteTempDirectory(Path tempDirPath) {
+		// Clean up the temporary directory
+		try {
+			FileUtils.deleteDirectory(tempDirPath.toFile());
+		} catch (IOException e) {
+			throw new DataVaultWorkerException("Failed to delete tempDirectory: " + tempDirPath, e);
+		}
+	}
 
-            channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-        }
-        
-        // Unreachable - the receiver never terminates
-        // channel.close();
-        // connection.close();
-    }
 }

@@ -1,23 +1,34 @@
 package org.datavaultplatform.common.storage.impl;
 
-import org.datavaultplatform.common.storage.Device;
-import org.datavaultplatform.common.storage.UserStore;
-import org.datavaultplatform.common.model.FileInfo;
-import org.datavaultplatform.common.io.Progress;
-import org.datavaultplatform.common.io.FileCopy;
-import org.apache.commons.io.IOUtils;
-
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-
-import com.dropbox.core.*;
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+
+import org.apache.commons.io.IOUtils;
+import org.datavaultplatform.common.exception.DataVaultException;
+import org.datavaultplatform.common.io.FileCopy;
+import org.datavaultplatform.common.io.Progress;
+import org.datavaultplatform.common.model.FileInfo;
+import org.datavaultplatform.common.storage.Device;
+import org.datavaultplatform.common.storage.UserStore;
+
+import com.dropbox.core.DbxAccountInfo;
+import com.dropbox.core.DbxClient;
+import com.dropbox.core.DbxEntry;
+import com.dropbox.core.DbxException;
+import com.dropbox.core.DbxRequestConfig;
+import com.dropbox.core.DbxWriteMode;
 
 // Documentation:
 // https://www.dropbox.com/developers-v1/core/start/java
@@ -81,13 +92,19 @@ public class DropboxFileSystem extends Device implements UserStore {
     }
 
     @Override
-    public boolean exists(String path) throws Exception {
+    public boolean exists(String path)  {
 
         if (!path.startsWith(PATH_SEPARATOR)) {
             path = PATH_SEPARATOR + path;
         }
         
-        DbxEntry entry = dbxClient.getMetadata(path);
+        DbxEntry entry;
+		try {
+			entry = dbxClient.getMetadata(path);
+		} catch (DbxException e) {
+			throw new DataVaultException(e);
+		}
+		
         if (entry != null) {
             return true;
         } else {

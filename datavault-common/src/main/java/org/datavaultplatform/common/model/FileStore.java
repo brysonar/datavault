@@ -1,14 +1,20 @@
 package org.datavaultplatform.common.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.HashMap;
 
-import javax.persistence.*;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.Lob;
+import javax.persistence.ManyToOne;
+import javax.persistence.Table;
 
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.hibernate.annotations.GenericGenerator;
 
-import java.sql.Blob;
-import java.util.HashMap;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Entity
@@ -40,12 +46,18 @@ public class FileStore {
     private User user;
     
     public FileStore() {}
+    
     public FileStore(String storageClass, HashMap<String,String> properties, String label) {
         this.storageClass = storageClass;
         this.properties = properties;
         this.label = label;
     }
 
+    @Override
+    public String toString() {
+    	   return ReflectionToStringBuilder.toString(this);
+    }
+    
     public String getID() { return id; }
 
     public String getStorageClass() { return storageClass; }

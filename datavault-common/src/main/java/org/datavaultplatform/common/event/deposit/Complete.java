@@ -1,8 +1,7 @@
 package org.datavaultplatform.common.event.deposit;
 
-import java.util.HashMap;
 import javax.persistence.Entity;
-import javax.persistence.Table;
+
 import org.datavaultplatform.common.event.Event;
 
 @Entity

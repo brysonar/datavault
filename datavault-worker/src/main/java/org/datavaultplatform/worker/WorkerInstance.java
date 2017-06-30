@@ -8,28 +8,30 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 public class WorkerInstance {
 
-    public static String getWorkerName() {
-        return java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
-    }
-    
+	private static final Logger logger = LoggerFactory.getLogger(WorkerInstance.class);
+	
+
     public static void main(String [] args) {
         
         // Bind $DATAVAULT_HOME to a system variable for use by Log4j
         System.setProperty("datavault-home", System.getenv("DATAVAULT_HOME"));
-        
-        Logger logger = LoggerFactory.getLogger(WorkerInstance.class);
+
         logger.info("Worker starting");
         
-        ApplicationContext context = new ClassPathXmlApplicationContext(new String[] {"datavault-worker.xml"});
-        
-        EventSender eventSender = context.getBean(EventSender.class);
-        Receiver receiver = context.getBean(Receiver.class);
+        ApplicationContext context = new ClassPathXmlApplicationContext("datavault-worker.xml");
+
+        MqReceiver mqReceiver = context.getBean(MqReceiver.class);
         
         // Listen to the message queue ...
         try {
-            receiver.receive(eventSender);
+        	mqReceiver.receive();
         } catch (Exception e) {
             logger.error("Error in receive", e);
         }
     }
+    
+    public static String getWorkerName() {
+        return java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+    }
+    
 }

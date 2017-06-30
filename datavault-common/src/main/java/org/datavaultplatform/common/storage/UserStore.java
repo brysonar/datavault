@@ -17,7 +17,7 @@ public interface UserStore {
     public boolean valid(String path);
     
     // Check if an object exists at the specified path
-    public boolean exists(String path) throws Exception;
+    public boolean exists(String path);
     
     // Get the size of an object (file/dir) in bytes
     public long getSize(String path) throws Exception;

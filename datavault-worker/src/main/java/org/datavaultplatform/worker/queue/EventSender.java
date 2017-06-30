@@ -11,33 +11,26 @@ import org.datavaultplatform.common.model.Agent;
 import org.datavaultplatform.worker.WorkerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 public class EventSender implements EventStream {
 
     private static final Logger logger = LoggerFactory.getLogger(EventSender.class);
-    
+
+    @Value("${queue.server}")
     private String queueServer;
+    
+    @Value("${queue.events}")
     private String eventQueueName;
+    
+    @Value("${queue.user}")
     private String queueUser;
+    
+    @Value("${queue.password}")
     private String queuePassword;
     
+    //TODO this is bad
     private int sequence = 0;
-
-    public void setQueueServer(String queueServer) {
-        this.queueServer = queueServer;
-    }
-
-    public void setEventQueueName(String eventQueueName) {
-        this.eventQueueName = eventQueueName;
-    }
-
-    public void setQueueUser(String queueUser) {
-        this.queueUser = queueUser;
-    }
-
-    public void setQueuePassword(String queuePassword) {
-        this.queuePassword = queuePassword;
-    }
     
     @Override
     public void send(Event event) {
@@ -75,4 +68,5 @@ public class EventSender implements EventStream {
             logger.error("Error sending message", e);
         }
     }
+    
 }

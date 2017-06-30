@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 
 public class WorkerManager {
 
+	private static final Logger logger = LoggerFactory.getLogger(WorkerManager.class);
+	
     private String numberOfWorkers;
 
     public void setNumberOfWorkers(String numberOfWorkers) {
@@ -36,8 +38,7 @@ public class WorkerManager {
             System.exit(1);
         }
         System.setProperty("datavault-home", System.getenv("DATAVAULT_HOME"));
-        
-        Logger logger = LoggerFactory.getLogger(WorkerManager.class);
+
         logger.info("Manager starting");
         
         ApplicationContext context = new ClassPathXmlApplicationContext(new String[] {"datavault-worker.xml"});
@@ -62,7 +63,8 @@ public class WorkerManager {
         CommandLine cmdLine = new CommandLine("java");
         cmdLine.addArgument("-cp");
         //cmdLine.addArgument("datavault-worker-1.0-SNAPSHOT-jar-with-dependencies.jar");
-        cmdLine.addArgument("datavault-worker-1.0-SNAPSHOT-jar:./*");
+//        cmdLine.addArgument("datavault-worker-1.0-SNAPSHOT-jar:./*");
+        cmdLine.addArgument("*");
         cmdLine.addArgument("org.datavaultplatform.worker.WorkerInstance");
 
         DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
