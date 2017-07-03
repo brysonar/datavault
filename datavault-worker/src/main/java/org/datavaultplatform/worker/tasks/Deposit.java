@@ -132,7 +132,7 @@ public class Deposit implements ITaskAction {
 		long archiveSize = tarFile.length();
 		logger.info("Tar file: " + archiveSize + " bytes");
 
-		packager.addTarfileChecksum(tempBagPath, tarHash, tarHashAlgorithm);
+		packager.addTarfileChecksum(tempBagPath, tarFile.toPath(), tarHash, tarHashAlgorithm);
 		
 		eventStream.send(new PackageComplete(depositDetails.getJobId(), depositDetails.getDepositId())
 				.withUserId(depositDetails.getUserId()).withNextState(3));
@@ -162,12 +162,7 @@ public class Deposit implements ITaskAction {
 
 	}
 
-	private Storage buildStorageConnections(Task task, DepositDetails depositDetails) throws DepositException {
-		UserStorage userStorage = connectToUserStorage(task.getUserFileStore(), depositDetails);
-		ArchiveStore archiveFs = connectToArchiveStorage(task.getArchiveFileStore(), depositDetails);
-		Storage storage = new Storage(userStorage, archiveFs);
-		return storage;
-	}
+
 
 	private File generateTar(Path tempDirectory, String bagId, Path tempBagPath) {
 		// Tar the bag directory
@@ -274,21 +269,13 @@ public class Deposit implements ITaskAction {
 		}
 	}
 
-	private ArchiveStore connectToArchiveStorage(org.datavaultplatform.common.model.ArchiveStore archiveFileStore,
-			DepositDetails depositDetails) throws DepositException {
-		// Connect to the archive storage
-		try {
-			Class<?> clazz = Class.forName(archiveFileStore.getStorageClass());
-			Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
-			Object instance = constructor.newInstance(archiveFileStore.getStorageClass(),
-					archiveFileStore.getProperties());
-			return (ArchiveStore) instance;
-		} catch (Exception e) {
-			String errMsg = "Deposit failed: could not access archive filesystem";
-			throw new DepositException(errMsg);
-		}
+	private Storage buildStorageConnections(Task task, DepositDetails depositDetails) throws DepositException {
+		UserStorage userStorage = connectToUserStorage(task.getUserFileStore(), depositDetails);
+		ArchiveStore archiveFs = connectToArchiveStorage(task.getArchiveFileStore(), depositDetails);
+		Storage storage = new Storage(userStorage, archiveFs);
+		return storage;
 	}
-
+	
 	private UserStorage connectToUserStorage(FileStore userFileStore, DepositDetails depositDetails)
 			throws DepositException {
 		// Connect to the user storage
@@ -306,6 +293,23 @@ public class Deposit implements ITaskAction {
 			throw new DepositException(errMsg, e);
 		}
 	}
+	
+	private ArchiveStore connectToArchiveStorage(org.datavaultplatform.common.model.ArchiveStore archiveFileStore,
+			DepositDetails depositDetails) throws DepositException {
+		// Connect to the archive storage
+		try {
+			Class<?> clazz = Class.forName(archiveFileStore.getStorageClass());
+			Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
+			Object instance = constructor.newInstance(archiveFileStore.getStorageClass(),
+					archiveFileStore.getProperties());
+			return (ArchiveStore) instance;
+		} catch (Exception e) {
+			String errMsg = "Deposit failed: could not access archive filesystem";
+			throw new DepositException(errMsg);
+		}
+	}
+
+
 
 	private void processRedeliver(boolean isRedeliver) throws DepositException {
 		if (isRedeliver) {

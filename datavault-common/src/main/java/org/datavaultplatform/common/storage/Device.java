@@ -20,7 +20,7 @@ public abstract class Device {
     }
     
     // How much space is available for storage (in bytes)
-    public abstract long getUsableSpace() throws Exception;
+    public abstract long getUsableSpace();
     
     // Copy an object (file/dir) to the working space
     // Progress information should be updated for monitoring as the copy occurs

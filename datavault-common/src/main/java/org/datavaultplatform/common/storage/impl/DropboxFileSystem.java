@@ -59,31 +59,24 @@ public class DropboxFileSystem extends Device implements UserStore {
         System.out.println("Connected to Dropbox account: " + dbxClient.getAccountInfo().displayName);
     }
     
-    @Override
-    public List<FileInfo> list(String path) {
-        
-        if (!path.startsWith(PATH_SEPARATOR)) {
-            path = PATH_SEPARATOR + path;
-        }
-        
-        ArrayList<FileInfo> files = new ArrayList<>();
+	@Override
+	public List<FileInfo> list(String path) {
 
-        try {
-            DbxEntry.WithChildren listing = dbxClient.getMetadataWithChildren(path);
-            for (DbxEntry child : listing.children) {
-                
-                FileInfo info = new FileInfo(child.path,
-                                             child.path,
-                                             child.name,
-                                             child.isFolder());
-                files.add(info);
-            }
-        } catch (DbxException e) {
-            System.out.println(e.toString());
-        }
+		if (!path.startsWith(PATH_SEPARATOR)) {
+			path = PATH_SEPARATOR + path;
+		}
 
-        return files;
-    }
+		ArrayList<FileInfo> files = new ArrayList<>();
+
+		DbxEntry.WithChildren listing = getDbxEntryWithChildren(path);
+		for (DbxEntry child : listing.children) {
+
+			FileInfo info = new FileInfo(child.path, child.path, child.name, child.isFolder());
+			files.add(info);
+		}
+
+		return files;
+	}
     
     @Override
     public boolean valid(String path) {
@@ -112,36 +105,45 @@ public class DropboxFileSystem extends Device implements UserStore {
         }
     }
     
-    @Override
-    public long getSize(String path) throws Exception {
+	@Override
+	public long getSize(String path) {
 
-        if (!path.startsWith(PATH_SEPARATOR)) {
-            path = PATH_SEPARATOR + path;
-        }
-        
-        DbxEntry entry = dbxClient.getMetadata(path);
-        if (entry == null) {
-            throw new FileNotFoundException();
-        } else {
-            long bytes = 0;
-            
-            if (entry instanceof DbxEntry.File) {
-                bytes = ((DbxEntry.File)entry).numBytes;
-            
-            } else if (entry instanceof DbxEntry.Folder) {
-                DbxEntry.WithChildren listing = dbxClient.getMetadataWithChildren(path);
-                for (DbxEntry child : listing.children) {
-                    if (child instanceof DbxEntry.File) {
-                        bytes += ((DbxEntry.File)child).numBytes;
-                    } else if (child instanceof DbxEntry.Folder) {
-                        bytes += getSize(child.path);
-                    }
-                }
-            }
-            
-            return bytes;
-        }
-    }
+		if (!path.startsWith(PATH_SEPARATOR)) {
+			path = PATH_SEPARATOR + path;
+		}
+
+		DbxEntry entry = getDbxEntry(path);
+		if (entry == null) {
+			throw new DataVaultException("File not found");
+		}
+
+		long bytes = 0;
+		if (entry instanceof DbxEntry.File) {
+			bytes = ((DbxEntry.File) entry).numBytes;
+
+		} else if (entry instanceof DbxEntry.Folder) {
+			DbxEntry.WithChildren listing = getDbxEntryWithChildren(path);
+			for (DbxEntry child : listing.children) {
+				if (child instanceof DbxEntry.File) {
+					bytes += ((DbxEntry.File) child).numBytes;
+				} else if (child instanceof DbxEntry.Folder) {
+					bytes += getSize(child.path);
+				}
+			}
+		}
+
+		return bytes;
+	}
+
+	private DbxEntry.WithChildren getDbxEntryWithChildren(String path) {
+		DbxEntry.WithChildren listing;
+		try {
+			listing = dbxClient.getMetadataWithChildren(path);
+		} catch (DbxException e) {
+			throw new DataVaultException(e.getMessage(), e);
+		}
+		return listing;
+	}
     
     public void get(Progress progress, String path, File localFile) throws Exception {
 
@@ -149,7 +151,7 @@ public class DropboxFileSystem extends Device implements UserStore {
             path = PATH_SEPARATOR + path;
         }
         
-        DbxEntry entry = dbxClient.getMetadata(path);
+        DbxEntry entry = getDbxEntry(path);
         if (entry == null) {
             throw new FileNotFoundException();
         } else {
@@ -165,8 +167,7 @@ public class DropboxFileSystem extends Device implements UserStore {
                     localFile.mkdirs();
                 }
                 
-                // Loop over the children of the folder
-                DbxEntry.WithChildren listing = dbxClient.getMetadataWithChildren(path);
+                DbxEntry.WithChildren listing = getDbxEntryWithChildren(path);
                 for (DbxEntry child : listing.children) {
                     get(progress, child.path, new File(localFile, child.name));
                 }
@@ -258,13 +259,13 @@ public class DropboxFileSystem extends Device implements UserStore {
     }
     
     @Override
-    public boolean isDirectory(String path) throws Exception {
+    public boolean isDirectory(String path) {
         
         if (!path.startsWith(PATH_SEPARATOR)) {
             path = PATH_SEPARATOR + path;
         }
         
-        DbxEntry entry = dbxClient.getMetadata(path);
+        DbxEntry entry = getDbxEntry(path);
         if (entry != null) {
             if (entry instanceof DbxEntry.Folder) {
                 return true;
@@ -275,15 +276,25 @@ public class DropboxFileSystem extends Device implements UserStore {
             return false;
         }
     }
+
+	private DbxEntry getDbxEntry(String path)  {
+		DbxEntry entry;
+		try {
+			entry = dbxClient.getMetadata(path);
+		} catch (DbxException e) {
+			throw new DataVaultException(e);
+		}
+		return entry;
+	}
     
     @Override
-    public String getName(String path) throws Exception {
+    public String getName(String path) {
         
         if (!path.startsWith(PATH_SEPARATOR)) {
             path = PATH_SEPARATOR + path;
         }
         
-        DbxEntry entry = dbxClient.getMetadata(path);
+        DbxEntry entry = getDbxEntry(path);
         if (entry == null) {
             return null;
         } else {
@@ -291,29 +302,35 @@ public class DropboxFileSystem extends Device implements UserStore {
         }
     }
     
-    @Override
-    public long getUsableSpace() throws Exception {
-        
-        DbxAccountInfo dbxAccountInfo = dbxClient.getAccountInfo();
-        DbxAccountInfo.Quota quota = dbxAccountInfo.quota;
-        
-        // The user's used quota outside of shared folders (bytes).
-        long used = quota.normal;
-        
-        // The user's used quota in shared folders (bytes).
-        // If the user belongs to a team,
-        // this includes all usage contributed to the team's quota outside
-        // of the user's own used quota (bytes).
-        long shared = quota.shared;
-        
-        // The user's total quota allocation (bytes).
-        // If the user belongs to a team,
-        // the team's total quota allocation (bytes)
-        long total = quota.total;
-        
-        // TODO: is this correct?
-        return total - (used + shared);
-    }
+	@Override
+	public long getUsableSpace() {
+
+		try {
+			DbxAccountInfo dbxAccountInfo = dbxClient.getAccountInfo();
+
+			DbxAccountInfo.Quota quota = dbxAccountInfo.quota;
+
+			// The user's used quota outside of shared folders (bytes).
+			long used = quota.normal;
+
+			// The user's used quota in shared folders (bytes).
+			// If the user belongs to a team,
+			// this includes all usage contributed to the team's quota outside
+			// of the user's own used quota (bytes).
+			long shared = quota.shared;
+
+			// The user's total quota allocation (bytes).
+			// If the user belongs to a team,
+			// the team's total quota allocation (bytes)
+			long total = quota.total;
+
+			// TODO: is this correct?
+			return total - (used + shared);
+
+		} catch (DbxException e) {
+			throw new DataVaultException(e.getMessage(), e);
+		}
+	}
 
     @Override
     public void retrieve(String path, File working, Progress progress) throws Exception {

@@ -59,18 +59,12 @@ public class MyPackager implements IPackager {
 		Path manifestPath = bagDirectory.resolve(DataVaultConstants.MANIFEST_FILE_NAME);
 		Path tempBagDataPath = bagDirectory.resolve(DataVaultConstants.DATA);
 		logger.debug("tempBagDataPath - {}", tempBagDataPath);
-		
-		listFiles(bagDirectory, tempBagDataPath, manifestPath);
-
-		//logger.info("Hashcodezz: " + manifestPath.toFile().delete());
-		
 		// validate checksum of each file
+		listFiles(bagDirectory, tempBagDataPath, manifestPath);
 		return true;
 	}
 
 	private void listFiles(final Path bagDirectory, final Path dataDirectory, final Path manifestFile) {
-		
-		boolean fileFound = false;
 		
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dataDirectory)) {
 			for (Path file : stream) {
@@ -86,9 +80,6 @@ public class MyPackager implements IPackager {
 			throw new RuntimeException(e);
 		}
 	}
-	
-	
-
 	
 	private void validateCheckSum(final Path bagDirectory, final Path manifestFile, final FileDetails fileDetails) {
 		logger.debug("validateCheckSum");
@@ -107,7 +98,7 @@ public class MyPackager implements IPackager {
 					fileFound = true;
 					if (!fields[0].equals(fileDetails.getCheckSum())) {
 						throw new RuntimeException("Checksum for " + fileDetails.getFilePath(bagDirectory)
-								+ " does not match " + fields[0] + " != " + fileDetails.getCheckSum());
+								+ " does not match actual: " + fileDetails.getCheckSum() + " != expected: " +  fields[0]);
 					} else {
 						logger.trace("Checksum for " + fileDetails.getFilePath(bagDirectory) + " matches");
 					}
@@ -290,10 +281,10 @@ public class MyPackager implements IPackager {
 	}
 
 	@Override
-	public void addTarfileChecksum(Path bagDirectory, String tarHash, CheckSumEnum tarHashAlgorithm) {
+	public void addTarfileChecksum(Path bagDirectory, Path tarfile, String tarHash, CheckSumEnum tarHashAlgorithm) {
 
 		File tagManifestFile = bagDirectory.resolve(DataVaultConstants.TAG_MANIFEST_FILE).toFile();
-		FileWriterUtil.writeToFile(tagManifestFile, tarHash + "," + DataVaultConstants.TAG_MANIFEST_FILE + ","
+		FileWriterUtil.writeToFile(tagManifestFile, tarHash + "," + tarfile.getFileName() + ","
 				+ tarHashAlgorithm.getJavaSecurityAlgorithm() + DataVaultConstants.NEW_LINE);
 	}
 

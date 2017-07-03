@@ -178,9 +178,9 @@ public class Packager implements IPackager {
     }
     
 	@Override
-	public void addTarfileChecksum(Path bagDirectory, String tarHash, CheckSumEnum tarHashAlgorithm) {
+	public void addTarfileChecksum(Path bagDirectory, Path tarfile, String tarHash, CheckSumEnum tarHashAlgorithm) {
 		
-		File tagManifestFile = bagDirectory.resolve(DataVaultConstants.TAG_MANIFEST_FILE).toFile();
-		FileWriterUtil.writeToFile(tagManifestFile, tarHash + "," + DataVaultConstants.TAG_MANIFEST_FILE + "," + tarHashAlgorithm.getJavaSecurityAlgorithm() + DataVaultConstants.NEW_LINE);
+//		File tagManifestFile = bagDirectory.resolve(DataVaultConstants.TAG_MANIFEST_FILE).toFile();
+//		FileWriterUtil.writeToFile(tagManifestFile, tarHash + "," + tarfile.getFileName() + "," + tarHashAlgorithm.getJavaSecurityAlgorithm() + DataVaultConstants.NEW_LINE);
 	}
 }

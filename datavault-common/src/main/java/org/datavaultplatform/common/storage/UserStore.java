@@ -20,11 +20,11 @@ public interface UserStore {
     public boolean exists(String path);
     
     // Get the size of an object (file/dir) in bytes
-    public long getSize(String path) throws Exception;
+    public long getSize(String path);
     
     // Get the name of an object
-    public String getName(String path) throws Exception;
+    public String getName(String path);
     
     // Check if the passed path is a directory/container
-    public boolean isDirectory(String path) throws Exception;
+    public boolean isDirectory(String path);
 }

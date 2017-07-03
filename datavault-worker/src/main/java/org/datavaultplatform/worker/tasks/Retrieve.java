@@ -2,6 +2,7 @@ package org.datavaultplatform.worker.tasks;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Map;
@@ -19,9 +20,13 @@ import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.storage.Verify;
 import org.datavaultplatform.common.task.Context;
 import org.datavaultplatform.common.task.Task;
+import org.datavaultplatform.worker.exception.RetrieveException;
+import org.datavaultplatform.worker.model.RetrieveDetails;
+import org.datavaultplatform.worker.model.UserStorage;
 import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.ProgressTracker;
 import org.datavaultplatform.worker.operations.Tar;
+import org.datavaultplatform.worker.util.DataVaultConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,193 +46,242 @@ public class Retrieve implements ITaskAction {
 	}
 
 	
-    @Override
-    public void performAction(Context context, Task task) {
-        
-        logger.info("Retrieve job - performAction()");
-        
-        Map<String, String> properties = task.getProperties();
-        String depositId = properties.get("depositId");
-        String retrieveId = properties.get("retrieveId");
-        String bagID = properties.get("bagId");
-        String retrievePath = properties.get("retrievePath");
-        String archiveId = properties.get("archiveId");
-        String userID = properties.get("userId");
-        String archiveDigest = properties.get("archiveDigest");
-        String archiveDigestAlgorithm = properties.get("archiveDigestAlgorithm");
-        long archiveSize = Long.parseLong(properties.get("archiveSize"));
+	@Override
+	public void performAction(Context context, Task task) {
 
-        if (task.isRedeliver()) {
-            eventStream.send(new Error(task.getJobID(), depositId, "Retrieve stopped: the message had been redelivered, please investigate")
-                .withUserId(userID));
-            return;
-        }
+		logger.info("Retrieve job - performAction()");
+
+		RetrieveDetails retrieveDetails = new RetrieveDetails().build(task);
+
+		try {
+			
+			doAction(context, task, retrieveDetails);
+
+		} catch (RetrieveException e) {
+			String msg = e.getMessage();
+			logger.error(msg, e);
+			eventStream.send(new Error(task.getJobID(), retrieveDetails.getDepositId(), msg)
+					.withUserId(retrieveDetails.getUserID()));
+			return;
+		}
+	}
+    
+	
+    private void doAction(Context context, Task task, RetrieveDetails retrieveDetais) throws RetrieveException {
+
+        stopProcessingIfRedeliver(task);
         
         ArrayList<String> states = buildStates();
         
-        eventStream.send(new InitStates(task.getJobID(), depositId, states)
-            .withUserId(userID));
+        eventStream.send(new InitStates(task.getJobID(), retrieveDetais.getDepositId(), states)
+            .withUserId(retrieveDetais.getUserID()));
         
-        eventStream.send(new RetrieveStart(task.getJobID(), depositId, retrieveId)
-            .withUserId(userID)
+        eventStream.send(new RetrieveStart(task.getJobID(), retrieveDetais.getDepositId(), retrieveDetais.getRetrieveId())
+            .withUserId(retrieveDetais.getUserID())
             .withNextState(0));
         
-        logger.info("bagID: " + bagID);
-        logger.info("retrievePath: " + retrievePath);
+        logger.info("BagId: {}, retrievePath", retrieveDetais.getBagId(), retrieveDetais.getRetrievePath());
+
+        UserStorage userStorage = connectToUserStorage(task);
+        Device archiveFs = connectToArchiveStorage(task);
+
+        try {
+            validateTargetDirectory(retrieveDetais, userStorage);
+            validateEnoughFreeSpace(task, retrieveDetais, userStorage);
+
+            // Retrieve the archived data
+            String tarFileName = retrieveDetais.getBagId() + ".tar";
+            
+            // Copy the tar file from the archive to the temporary area
+            Path tarTempPath = context.getTempDir().resolve(tarFileName);
+            File tarTempFile = tarTempPath.toFile();
+
+			copyFilesToTempDirectory(task, retrieveDetais, archiveFs, tarTempFile);
+            validateTarChecksum(task, retrieveDetais, tarTempFile);
+            
+            // Decompress to the temporary directory
+            File bagDir = Tar.unTar(tarTempFile, context.getTempDir());
+
+            // Validate the bagit directory
+            if (!packager.validateBag(bagDir.toPath())) {
+                throw new RuntimeException("Bag is invalid");
+            }
+
+            copyExtractedFilesToTargetRetrieveArea(task, retrieveDetais, userStorage, bagDir);
+            
+            // Cleanup
+            logger.info("Cleaning up ...");
+            if (DataVaultConstants.doTempDirectoryCleanUp) {
+            	FileUtils.deleteDirectory(bagDir);
+            	tarTempFile.delete();
+            }
+            
+            logger.info("Data retrieve complete: " + retrieveDetais.getRetrievePath());
+            eventStream.send(new RetrieveComplete(task.getJobID(), retrieveDetais.getDepositId(), retrieveDetais.getRetrieveId()).withNextState(4)
+                .withUserId(retrieveDetais.getUserID()));
+            
+        } catch (Exception e) {
+            String errMsg = "Data retrieve failed: " + e.getMessage();
+            throw new RetrieveException(errMsg, e);
+        }
+    }
+
+
+	private void copyExtractedFilesToTargetRetrieveArea(Task task, RetrieveDetails retrieveDetais,
+			UserStorage userStorage, File bagDir) throws Exception, InterruptedException {
+		// Copy the extracted files to the target retrieve area
+		
+		logger.info("Copying to user directory ...");
+		
+		long bagDirSize = FileUtils.sizeOfDirectory(bagDir);
+		
+		eventStream.send(new UpdateProgress(task.getJobID(), retrieveDetais.getDepositId(), 0, bagDirSize, "Starting transfer ...")
+		    .withUserId(retrieveDetais.getUserID())
+		    .withNextState(3));
+		
+		// Progress tracking (threaded)
+		Progress progress = new Progress();
+		ProgressTracker tracker = new ProgressTracker(progress, task.getJobID(), retrieveDetais.getDepositId(), bagDirSize, eventStream);
+		Thread trackerThread = new Thread(tracker);
+		trackerThread.start();
+		
+		try {
+		    // Ask the driver to copy files to the user directory
+			userStorage.getUserFs().store(retrieveDetais.getRetrievePath(), bagDir, progress);
+		} finally {
+		    // Stop the tracking thread
+		    tracker.stop();
+		    trackerThread.join();
+		}
+		
+		logger.info("Copied: " + progress.dirCount + " directories, " + progress.fileCount + " files, " + progress.byteCount + " bytes");
+	}
+
+
+	private void validateTarChecksum(Task task, RetrieveDetails retrieveDetais, File tarTempFile) throws Exception {
+		logger.info("Validating data ...");
+		eventStream.send(new UpdateProgress(task.getJobID(), retrieveDetais.getDepositId()).withNextState(2)
+		    .withUserId(retrieveDetais.getUserID()));
+		
+		// Verify integrity with deposit checksum
+		String systemAlgorithm = Verify.getAlgorithm();
+		if (!systemAlgorithm.equals(retrieveDetais.getArchiveDigestAlgorithm())) {
+		    throw new Exception("Unsupported checksum algorithm: " + retrieveDetais.getArchiveDigestAlgorithm());
+		}
+		
+		String tarTempHash = Verify.getDigest(tarTempFile);
+		logger.info("Checksum type: " + retrieveDetais.getArchiveDigestAlgorithm());
+		logger.info("Checksum of tar copied to temp directory: " + tarTempHash);
+		
+		if (!tarTempHash.equals(retrieveDetais.getArchiveDigest())) {
+		    throw new RuntimeException("Checksum failed - tarfile checksum: " + tarTempHash + " != expected: " + retrieveDetais.getArchiveDigest());
+		}
+	}
+
+
+	private void copyFilesToTempDirectory(Task task, RetrieveDetails retrieveDetais, Device archiveFs, File tarTempFile)
+			throws Exception, InterruptedException {
+		
+        eventStream.send(new UpdateProgress(task.getJobID(), retrieveDetais.getDepositId(), 0, retrieveDetais.getArchiveSize(), "Starting transfer ...")
+                .withUserId(retrieveDetais.getUserID())
+                .withNextState(1));
         
-        Device userFs;
-        UserStore userStore;
-        Device archiveFs;
-        
-        // Connect to the user storage
+		// Progress tracking (threaded)
+		Progress progress = new Progress();
+		ProgressTracker tracker = new ProgressTracker(progress, task.getJobID(), retrieveDetais.getDepositId(), retrieveDetais.getArchiveSize(), eventStream);
+		Thread trackerThread = new Thread(tracker);
+		trackerThread.start();
+
+		try {
+		    // Ask the driver to copy files to the temp directory
+		    archiveFs.retrieve(retrieveDetais.getArchiveId(), tarTempFile, progress);
+		} finally {
+		    // Stop the tracking thread
+		    tracker.stop();
+		    trackerThread.join();
+		}
+		
+		logger.info("Copied: " + progress.dirCount + " directories, " + progress.fileCount + " files, " + progress.byteCount + " bytes");
+	}
+
+
+	private void validateEnoughFreeSpace(Task task, RetrieveDetails retrieveDetais, UserStorage userStorage)
+			throws RetrieveException {
+		// Check that there's enough free space ...
+		long freespace = 0;
+		boolean isFreeSpaceUndetermined = false;
+		try {
+		    freespace = userStorage.getUserFs().getUsableSpace();
+		    logger.info("Free space: " + freespace + " bytes (" +  FileUtils.byteCountToDisplaySize(freespace) + ")");
+
+		} catch (RuntimeException e) {
+		    logger.info("Unable to determine free space");
+		    isFreeSpaceUndetermined = true;
+		    eventStream.send(new Error(task.getJobID(), retrieveDetais.getDepositId(), "Unable to determine free space")
+		        .withUserId(retrieveDetais.getUserID()));
+		}
+		
+		if (!isFreeSpaceUndetermined) {
+			if (freespace < retrieveDetais.getArchiveSize()) {
+				String errMsg = "Not enough free space to retrieve data!";
+				throw new RetrieveException(errMsg);
+			}
+		}
+	}
+
+
+	private void validateTargetDirectory(RetrieveDetails retrieveDetais, UserStorage userStorage)
+			throws RetrieveException {
+
+		if (!userStorage.getUserStore().exists(retrieveDetais.getRetrievePath())
+				|| !userStorage.getUserStore().isDirectory(retrieveDetais.getRetrievePath())) {
+			// Target path must exist and be a directory
+			String errMsg = "Target directory not found!";
+			throw new RetrieveException(errMsg);
+		}
+
+	}
+
+
+	private UserStorage connectToUserStorage(Task task) throws RetrieveException {
+		
+		// Connect to the user storage
         try {
             Class<?> clazz = Class.forName(task.getUserFileStore().getStorageClass());
             Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
             Object instance = constructor.newInstance(task.getUserFileStore().getStorageClass(), task.getUserFileStore().getProperties());
-            userFs = (Device)instance;
-            userStore = (UserStore)userFs;
+            Device userFs = (Device) instance;
+            UserStore userStore = (UserStore) userFs;
+            return new UserStorage(userFs, userStore);
+            
         } catch (Exception e) {
-            String msg = "Retrieve failed: could not access active filesystem";
-            logger.error(msg, e);
-            eventStream.send(new Error(task.getJobID(), depositId, msg)
-                .withUserId(userID));
-            return;
+            String errMsg = "Retrieve failed: could not access active filesystem";
+			throw new RetrieveException(errMsg);
         }
-        
-        // Connect to the archive storage
+	}
+
+	private Device connectToArchiveStorage(Task task) throws RetrieveException {
+		
+		// Connect to the archive storage
+		Device archiveFs = null;
         try {
             Class<?> clazz = Class.forName(task.getArchiveFileStore().getStorageClass());
             Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
             Object instance = constructor.newInstance(task.getArchiveFileStore().getStorageClass(), task.getArchiveFileStore().getProperties());
             archiveFs = (Device)instance;
-        } catch (Exception e) {
-            String msg = "Retrieve failed: could not access archive filesystem";
-            logger.error(msg, e);
-            eventStream.send(new Error(task.getJobID(), depositId, msg)
-                .withUserId(userID));
-            return;
+        } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            String errMsg = "Retrieve failed: could not access archive filesystem";
+            throw new RetrieveException(errMsg, e);
+		}
+		return archiveFs;
+	}
+	
+	private void stopProcessingIfRedeliver(Task task) throws RetrieveException {
+		if (task.isRedeliver()) {
+            String errMsg = "Retrieve stopped: the message had been redelivered, please investigate";
+			throw new RetrieveException(errMsg);
         }
-        
-        try {
-            if (!userStore.exists(retrievePath) || !userStore.isDirectory(retrievePath)) {
-                // Target path must exist and be a directory
-                logger.info("Target directory not found!");
-            }
-            
-            // Check that there's enough free space ...
-            try {
-                long freespace = userFs.getUsableSpace();
-                logger.info("Free space: " + freespace + " bytes (" +  FileUtils.byteCountToDisplaySize(freespace) + ")");
-                if (freespace < archiveSize) {
-                    eventStream.send(new Error(task.getJobID(), depositId, "Not enough free space to retrieve data!")
-                        .withUserId(userID));
-                    return;
-                }
-            } catch (Exception e) {
-                logger.info("Unable to determine free space");
-                eventStream.send(new Error(task.getJobID(), depositId, "Unable to determine free space")
-                    .withUserId(userID));
-            }
-
-            // Retrieve the archived data
-            String tarFileName = bagID + ".tar";
-            
-            // Copy the tar file from the archive to the temporary area
-            Path tarPath = context.getTempDir().resolve(tarFileName);
-            File tarFile = tarPath.toFile();
-            
-            eventStream.send(new UpdateProgress(task.getJobID(), depositId, 0, archiveSize, "Starting transfer ...")
-                .withUserId(userID)
-                .withNextState(1));
-            
-            // Progress tracking (threaded)
-            Progress progress = new Progress();
-            ProgressTracker tracker = new ProgressTracker(progress, task.getJobID(), depositId, archiveSize, eventStream);
-            Thread trackerThread = new Thread(tracker);
-            trackerThread.start();
-
-            try {
-                // Ask the driver to copy files to the temp directory
-                archiveFs.retrieve(archiveId, tarFile, progress);
-            } finally {
-                // Stop the tracking thread
-                tracker.stop();
-                trackerThread.join();
-            }
-            
-            logger.info("Copied: " + progress.dirCount + " directories, " + progress.fileCount + " files, " + progress.byteCount + " bytes");
-            
-            logger.info("Validating data ...");
-            eventStream.send(new UpdateProgress(task.getJobID(), depositId).withNextState(2)
-                .withUserId(userID));
-            
-            // Verify integrity with deposit checksum
-            String systemAlgorithm = Verify.getAlgorithm();
-            if (!systemAlgorithm.equals(archiveDigestAlgorithm)) {
-                throw new Exception("Unsupported checksum algorithm: " + archiveDigestAlgorithm);
-            }
-            
-            String tarHash = Verify.getDigest(tarFile);
-            logger.info("Checksum algorithm: " + archiveDigestAlgorithm);
-            logger.info("Checksum: " + tarHash);
-            
-            if (!tarHash.equals(archiveDigest)) {
-                throw new Exception("checksum failed: " + tarHash + " != " + archiveDigest);
-            }
-            
-            // Decompress to the temporary directory
-            File bagDir = Tar.unTar(tarFile, context.getTempDir());
-            long bagDirSize = FileUtils.sizeOfDirectory(bagDir);
-            
-            // Validate the bagit directory
-            if (!packager.validateBag(bagDir.toPath())) {
-                throw new Exception("Bag is invalid");
-            }
-            
-            // Get the payload data directory
-            // File payloadDir = bagDir.toPath().resolve("data").toFile();
-            // long payloadSize = FileUtils.sizeOfDirectory(payloadDir);
-            
-            // Copy the extracted files to the target retrieve area
-            logger.info("Copying to user directory ...");
-            eventStream.send(new UpdateProgress(task.getJobID(), depositId, 0, bagDirSize, "Starting transfer ...")
-                .withUserId(userID)
-                .withNextState(3));
-            
-            // Progress tracking (threaded)
-            progress = new Progress();
-            tracker = new ProgressTracker(progress, task.getJobID(), depositId, bagDirSize, eventStream);
-            trackerThread = new Thread(tracker);
-            trackerThread.start();
-            
-            try {
-                // Ask the driver to copy files to the user directory
-                userFs.store(retrievePath, bagDir, progress);
-            } finally {
-                // Stop the tracking thread
-                tracker.stop();
-                trackerThread.join();
-            }
-            
-            logger.info("Copied: " + progress.dirCount + " directories, " + progress.fileCount + " files, " + progress.byteCount + " bytes");
-            
-            // Cleanup
-            logger.info("Cleaning up ...");
-            FileUtils.deleteDirectory(bagDir);
-            tarFile.delete();
-            
-            logger.info("Data retrieve complete: " + retrievePath);
-            eventStream.send(new RetrieveComplete(task.getJobID(), depositId, retrieveId).withNextState(4)
-                .withUserId(userID));
-            
-        } catch (Exception e) {
-            String msg = "Data retrieve failed: " + e.getMessage();
-            logger.error(msg, e);
-            eventStream.send(new Error(task.getJobID(), depositId, msg)
-                .withUserId(userID));
-        }
-    }
-
+	}
 
 	private ArrayList<String> buildStates() {
 		ArrayList<String> states = new ArrayList<>();

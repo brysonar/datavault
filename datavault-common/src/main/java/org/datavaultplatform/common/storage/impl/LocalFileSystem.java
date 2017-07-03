@@ -71,7 +71,8 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
             }
 
         } catch (IOException e) {
-            System.out.println(e.toString());
+        	//TODO do we really want to swallow error
+        	logger.error(e.getMessage(), e);
         }
 
         return files;
@@ -117,7 +118,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
     }
     
     @Override
-    public long getUsableSpace() throws Exception {
+    public long getUsableSpace() {
         File file = new File(rootPath);
         return file.getUsableSpace();
     }
@@ -189,7 +190,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
                 return null;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error(e.getMessage(), e);
             return null;
         }
     }
@@ -211,7 +212,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
             }
         }
         catch (Exception e) {
-            e.printStackTrace();
+        	logger.error(e.getMessage(), e);
             return false;
         }
     }

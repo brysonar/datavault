@@ -1,28 +1,34 @@
 package org.datavaultplatform.common.storage.impl;
 
-import org.datavaultplatform.common.storage.Device;
-import org.datavaultplatform.common.storage.UserStore;
-import org.datavaultplatform.common.model.FileInfo;
-import org.datavaultplatform.common.io.Progress;
-import org.datavaultplatform.common.storage.impl.ssh.Utility;
-
 import java.io.File;
-import java.io.OutputStream;
-import java.io.BufferedOutputStream;
-import java.io.BufferedInputStream;
 import java.io.InputStream;
-import java.io.FileInputStream;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
-import com.jcraft.jsch.*;
-import org.slf4j.*;
+import org.datavaultplatform.common.exception.DataVaultException;
+import org.datavaultplatform.common.io.Progress;
+import org.datavaultplatform.common.model.FileInfo;
+import org.datavaultplatform.common.storage.Device;
+import org.datavaultplatform.common.storage.UserStore;
+import org.datavaultplatform.common.storage.impl.ssh.Utility;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
+import com.jcraft.jsch.SftpATTRS;
+import com.jcraft.jsch.SftpException;
+import com.jcraft.jsch.SftpStatVFS;
 
 public class SFTPFileSystem extends Device implements UserStore {
 
-    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(SFTPFileSystem.class);
+    private static final Logger logger = LoggerFactory.getLogger(SFTPFileSystem.class);
 
     private String host = null;
     private String rootPath = null;
@@ -51,7 +57,7 @@ public class SFTPFileSystem extends Device implements UserStore {
         passphrase = config.get("passphrase");
     }
     
-    private void Connect() throws Exception {
+    private void Connect() throws JSchException, SftpException  {
         JSch jsch = new JSch();
         session = jsch.getSession(username, host, port);
 
@@ -168,7 +174,8 @@ public class SFTPFileSystem extends Device implements UserStore {
             }
             
         } catch (Exception e) {
-            e.printStackTrace();
+        	//TODO do we really want to swallow error
+        	logger.error(e.getMessage(), e);
         } finally {
             Disconnect();
         }
@@ -194,7 +201,7 @@ public class SFTPFileSystem extends Device implements UserStore {
             return true;
             
         } catch (Exception e) {
-            e.printStackTrace();
+        	logger.error(e.getMessage(), e);
             return false;
         } finally {
             Disconnect();
@@ -202,7 +209,7 @@ public class SFTPFileSystem extends Device implements UserStore {
     }
     
     @Override
-    public long getSize(String path) throws Exception {
+    public long getSize(String path) {
         
         try {
             Connect();
@@ -222,28 +229,27 @@ public class SFTPFileSystem extends Device implements UserStore {
             }
             
         } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
+            throw new DataVaultException(e);
         } finally {
             Disconnect();
         }
     }
 
-    @Override
-    public boolean isDirectory(String path) throws Exception {
-        try {
-            Connect();
-            
-            SftpATTRS attrs = channelSftp.stat(rootPath + PATH_SEPARATOR + path);
-            return attrs.isDir();
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        } finally {
-            Disconnect();
-        }
-    }
+	@Override
+	public boolean isDirectory(String path) {
+		try {
+
+			Connect();
+
+			SftpATTRS attrs = channelSftp.stat(rootPath + PATH_SEPARATOR + path);
+			return attrs.isDir();
+
+		} catch (JSchException | SftpException e) {
+			throw new DataVaultException(e);
+		} finally {
+			Disconnect();
+		}
+	}
     
     @Override
     public String getName(String path) {
@@ -255,7 +261,7 @@ public class SFTPFileSystem extends Device implements UserStore {
     }
     
     @Override
-    public long getUsableSpace() throws Exception {
+    public long getUsableSpace() {
         try {
             Connect();
             
@@ -267,15 +273,14 @@ public class SFTPFileSystem extends Device implements UserStore {
             return statVFS.getAvailForNonRoot() * 1024; // bytes
             
         } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
+            throw new DataVaultException(e);
         } finally {
             Disconnect();
         }
     }
 
     @Override
-    public void retrieve(String path, File working, Progress progress) throws Exception {
+    public void retrieve(String path, File working, Progress progress) {
         
         // Strip any leading separators (we want a path relative to the current dir)
         while (path.startsWith(PATH_SEPARATOR)) {
@@ -297,15 +302,14 @@ public class SFTPFileSystem extends Device implements UserStore {
             Utility.getDir(channelSftp, path, working, attrs, monitor);
             
         } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
+            throw new DataVaultException(e);
         } finally {
             Disconnect();
         }
     }
     
     @Override
-    public String store(String path, File working, Progress progress) throws Exception {
+    public String store(String path, File working, Progress progress) {
         
         // Strip any leading separators (we want a path relative to the current dir)
         while (path.startsWith(PATH_SEPARATOR)) {
@@ -330,8 +334,7 @@ public class SFTPFileSystem extends Device implements UserStore {
             Utility.sendDirectory(channelSftp, working.toPath(), monitor);
             
         } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
+            throw new DataVaultException(e);
         } finally {
             Disconnect();
         }
