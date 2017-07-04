@@ -9,9 +9,9 @@ import java.nio.file.Paths;
 
 import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.storage.CheckSumEnum;
-import org.datavaultplatform.worker.util.ChecksumUtil;
+import org.datavaultplatform.worker.util.CheckSumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
-import org.datavaultplatform.worker.util.FileWriterUtil;
+import org.datavaultplatform.worker.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,7 +120,7 @@ public class Packager implements IPackager {
         
         File metadataFile = metadataDirPath.resolve(metadataFileName).toFile();
         FileUtils.writeStringToFile(metadataFile, metadata);
-        String hash = ChecksumUtil.computeFileHash(metadataFile, alg);
+        String hash = CheckSumUtil.computeFileHash(metadataFile, alg);
         FileUtils.writeStringToFile(tagManifest, hash + "  " + metadataDirName + "/" + metadataFileName + "\r\n", true);
     }
     

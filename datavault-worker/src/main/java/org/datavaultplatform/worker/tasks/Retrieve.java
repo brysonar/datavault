@@ -15,9 +15,9 @@ import org.datavaultplatform.common.event.UpdateProgress;
 import org.datavaultplatform.common.event.retrieve.RetrieveComplete;
 import org.datavaultplatform.common.event.retrieve.RetrieveStart;
 import org.datavaultplatform.common.io.Progress;
+import org.datavaultplatform.common.storage.CheckSumEnum;
 import org.datavaultplatform.common.storage.Device;
 import org.datavaultplatform.common.storage.UserStore;
-import org.datavaultplatform.common.storage.Verify;
 import org.datavaultplatform.common.task.Context;
 import org.datavaultplatform.common.task.Task;
 import org.datavaultplatform.worker.exception.RetrieveException;
@@ -26,6 +26,7 @@ import org.datavaultplatform.worker.model.UserStorage;
 import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.ProgressTracker;
 import org.datavaultplatform.worker.operations.Tar;
+import org.datavaultplatform.worker.util.CheckSumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,8 @@ public class Retrieve implements ITaskAction {
     
     private static final Logger logger = LoggerFactory.getLogger(Retrieve.class);
     
+	public final CheckSumEnum tarCheckSumEnum = DataVaultConstants.TAR_CHECKSUM_ENUM;
+	
 	private final IPackager packager;
 	private final EventStream eventStream;
 	
@@ -121,7 +124,7 @@ public class Retrieve implements ITaskAction {
                 .withUserId(retrieveDetais.getUserID()));
             
         } catch (Exception e) {
-            String errMsg = "Data retrieve failed: " + e.getMessage();
+            String errMsg = "Data retrieve failed -  " + e.getMessage();
             throw new RetrieveException(errMsg, e);
         }
     }
@@ -164,17 +167,17 @@ public class Retrieve implements ITaskAction {
 		    .withUserId(retrieveDetais.getUserID()));
 		
 		// Verify integrity with deposit checksum
-		String systemAlgorithm = Verify.getAlgorithm();
+		String systemAlgorithm = tarCheckSumEnum.getJavaSecurityAlgorithm();
 		if (!systemAlgorithm.equals(retrieveDetais.getArchiveDigestAlgorithm())) {
 		    throw new Exception("Unsupported checksum algorithm: " + retrieveDetais.getArchiveDigestAlgorithm());
 		}
 		
-		String tarTempHash = Verify.getDigest(tarTempFile);
+		String tarTempHash = CheckSumUtil.getDigest(tarTempFile, tarCheckSumEnum);
 		logger.info("Checksum type: " + retrieveDetais.getArchiveDigestAlgorithm());
 		logger.info("Checksum of tar copied to temp directory: " + tarTempHash);
 		
 		if (!tarTempHash.equals(retrieveDetais.getArchiveDigest())) {
-		    throw new RuntimeException("Checksum failed - tarfile checksum: " + tarTempHash + " != expected: " + retrieveDetais.getArchiveDigest());
+		    throw new RuntimeException("Checksum validation failed - tarfile checksum: " + tarTempHash + " != expected: " + retrieveDetais.getArchiveDigest());
 		}
 	}
 

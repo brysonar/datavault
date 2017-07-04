@@ -8,9 +8,9 @@ import java.nio.file.Path;
 
 import org.datavaultplatform.common.storage.CheckSumEnum;
 import org.datavaultplatform.worker.model.FileDetails;
-import org.datavaultplatform.worker.util.ChecksumUtil;
+import org.datavaultplatform.worker.util.CheckSumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
-import org.datavaultplatform.worker.util.FileWriterUtil;
+import org.datavaultplatform.worker.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,7 +24,7 @@ public class ManifestSingleLineGenerator implements ManifestGenerator {
 		logger.debug("Creating Bag: {}, {}", bagDirectory, dataDirectory);
 
 		Path manifestPath = writeManifestFile(bagDirectory, dataDirectory);
-		String manifestChecksum = ChecksumUtil.generateCheckSum(manifestPath, getCheckSumEnum());
+		String manifestChecksum = CheckSumUtil.generateCheckSum(manifestPath, getCheckSumEnum());
 		return manifestChecksum;
 	}
 
@@ -43,9 +43,9 @@ public class ManifestSingleLineGenerator implements ManifestGenerator {
 				if (Files.isDirectory(file)) {
 					listFiles(file, bagDirectory, manifestFile);
 				} else {
-					FileDetails fileDetails = new FileDetails(file, ChecksumUtil.generateCheckSum(file, getCheckSumEnum()));
+					FileDetails fileDetails = new FileDetails(file, CheckSumUtil.generateCheckSum(file, getCheckSumEnum()));
 					String line = fileDetails.getCheckSum() + "," + fileDetails.getFilePath(bagDirectory) + "," + getCheckSumEnum() + DataVaultConstants.NEW_LINE;
-					FileWriterUtil.writeToFile(manifestFile, line);
+					FileUtil.writeToFile(manifestFile, line);
 				}
 			}
 		} catch (IOException e) {
@@ -54,6 +54,6 @@ public class ManifestSingleLineGenerator implements ManifestGenerator {
 	}
 
 	private CheckSumEnum getCheckSumEnum() {
-		return DataVaultConstants.checkSumEnum;
+		return DataVaultConstants.CHECKSUM_ENUM;
 	}
 }

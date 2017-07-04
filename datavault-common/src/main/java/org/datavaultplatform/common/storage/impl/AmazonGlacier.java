@@ -6,7 +6,7 @@ import java.util.Map;
 import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.storage.ArchiveStore;
 import org.datavaultplatform.common.storage.Device;
-import org.datavaultplatform.common.storage.Verify;
+import org.datavaultplatform.common.storage.VerifyMethod;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -27,7 +27,7 @@ public class AmazonGlacier extends Device implements ArchiveStore {
     // Amazon Glacier has retrieval costs so a full copy-back is undesirable.
     // TODO: verify the hashes which are available from a glacier vault inventory.
     // Vault inventory is carried out every 24 hours.
-    public Verify.Method verificationMethod = Verify.Method.LOCAL_ONLY;
+    public VerifyMethod verificationMethod = VerifyMethod.LOCAL_ONLY;
     
     // A reference to the account which is related to the current credentials
     private String DEFAULT_ACCOUNT_NAME = "-";
@@ -175,7 +175,7 @@ public class AmazonGlacier extends Device implements ArchiveStore {
     }
     
     @Override
-    public Verify.Method getVerifyMethod() {
+    public VerifyMethod getVerifyMethod() {
         return verificationMethod;
     }
 }

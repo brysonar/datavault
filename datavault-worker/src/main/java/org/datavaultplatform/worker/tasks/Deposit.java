@@ -1,7 +1,6 @@
 package org.datavaultplatform.worker.tasks;
 
 import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -26,9 +25,10 @@ import org.datavaultplatform.common.storage.ArchiveStore;
 import org.datavaultplatform.common.storage.CheckSumEnum;
 import org.datavaultplatform.common.storage.Device;
 import org.datavaultplatform.common.storage.UserStore;
-import org.datavaultplatform.common.storage.Verify;
+import org.datavaultplatform.common.storage.VerifyMethod;
 import org.datavaultplatform.common.task.Context;
 import org.datavaultplatform.common.task.Task;
+import org.datavaultplatform.worker.exception.DataVaultWorkerException;
 import org.datavaultplatform.worker.exception.DepositException;
 import org.datavaultplatform.worker.model.DepositDetails;
 import org.datavaultplatform.worker.model.MetaData;
@@ -38,7 +38,9 @@ import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.Identifier;
 import org.datavaultplatform.worker.operations.ProgressTracker;
 import org.datavaultplatform.worker.operations.Tar;
+import org.datavaultplatform.worker.util.CheckSumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
+import org.datavaultplatform.worker.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,11 +50,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class Deposit implements ITaskAction {
 
+	private static final String DEPOSIT_FAILED_PREFIX = "Deposit failed - ";
+
 	private final static Logger logger = LoggerFactory.getLogger(Deposit.class);
 
 	private final IPackager packager;
 	private final EventStream eventStream;
 
+	//public final CheckSumEnum checkSumEnum = DataVaultConstants.CHECKSUM_ENUM;
+	public final CheckSumEnum tarCheckSumEnum = DataVaultConstants.TAR_CHECKSUM_ENUM;
+	
 	@Autowired
 	public Deposit(IPackager packager, EventStream eventStream) {
 		super();
@@ -77,7 +84,7 @@ public class Deposit implements ITaskAction {
 			if (e instanceof DepositException) {
 				errMsg = e.getMessage();
 			} else {
-				errMsg = "Deposit failed: " + e.getMessage();
+				errMsg = DEPOSIT_FAILED_PREFIX + e.getMessage();
 			}
 
 			logger.error(errMsg);
@@ -99,7 +106,7 @@ public class Deposit implements ITaskAction {
 		eventStream.send(new Start(depositDetails.getJobId(), depositDetails.getDepositId())
 				.withUserId(depositDetails.getUserId()).withNextState(0));
 
-		logger.info("Bag Id: {}, Deposit file:: {}", depositDetails.getBagId(), depositDetails.getFilePath());
+		logger.info("Bag Id: {}, Deposit file: {}", depositDetails.getBagId(), depositDetails.getFilePath());
 
 		Storage storage = buildStorageConnections(task, depositDetails);
 
@@ -124,21 +131,22 @@ public class Deposit implements ITaskAction {
 		buildMetaData(metaData, tempBagPath, tempBagDataPath);
 
 		File tarFile = generateTar(context.getTempDir(), depositDetails.getBagId(), tempBagPath);
-		String tarHash = Verify.getDigest(tarFile);
-		logger.info("Checksum: " + tarHash);
-		CheckSumEnum tarHashAlgorithm = Verify.getAlgorithmCheckSum();
-		logger.info("Checksum algorithm: " + tarHashAlgorithm.getJavaSecurityAlgorithm());
+		
+		String tarHash = CheckSumUtil.getDigest(tarFile, tarCheckSumEnum);
+		logger.info("Tar file Checksum: " + tarHash + " using " + tarCheckSumEnum.getJavaSecurityAlgorithm());
 
 		long archiveSize = tarFile.length();
 		logger.info("Tar file: " + archiveSize + " bytes");
 
-		packager.addTarfileChecksum(tempBagPath, tarFile.toPath(), tarHash, tarHashAlgorithm);
+		//TODO review with Robin to see if we need this. It is not added to the file in the tar only metadata directory
+		//the checksum has is sent with receiver so must be stored in dbase
+		packager.addTarfileChecksum(tempBagPath, tarFile.toPath(), tarHash, tarCheckSumEnum);
 		
 		eventStream.send(new PackageComplete(depositDetails.getJobId(), depositDetails.getDepositId())
 				.withUserId(depositDetails.getUserId()).withNextState(3));
 
 		eventStream.send(
-				new ComputedDigest(depositDetails.getJobId(), depositDetails.getDepositId(), tarHash, tarHashAlgorithm.getJavaSecurityAlgorithm())
+				new ComputedDigest(depositDetails.getJobId(), depositDetails.getDepositId(), tarHash, tarCheckSumEnum.getJavaSecurityAlgorithm())
 						.withUserId(depositDetails.getUserId()));
 
 		copyToMetaDirectory(context, depositDetails, tempBagPath.toFile());
@@ -147,7 +155,7 @@ public class Deposit implements ITaskAction {
 
 		// TODO there is multiple deletes of this directory - see verify archive
 		//if (DataVaultConstants.doTempDirectoryCleanUp) {
-			deleteDirectory(tempBagDataPath.toFile());
+		FileUtil.deleteDirectory(tempBagDataPath.toFile());
 		//}
 
 		eventStream.send(new UpdateProgress(depositDetails.getJobId(), depositDetails.getDepositId())
@@ -161,8 +169,6 @@ public class Deposit implements ITaskAction {
 		logger.info("Deposit complete: {}", archiveId);
 
 	}
-
-
 
 	private File generateTar(Path tempDirectory, String bagId, Path tempBagPath) {
 		// Tar the bag directory
@@ -238,12 +244,12 @@ public class Deposit implements ITaskAction {
 
 		logger.info("Verification method: " + archiveFs.getVerifyMethod());
 
-		if (archiveFs.getVerifyMethod() == Verify.Method.LOCAL_ONLY) {
+		if (archiveFs.getVerifyMethod() == VerifyMethod.LOCAL_ONLY) {
 
 			// Verify the contents of the temporary file
 			verifyTarFile(context.getTempDir(), tarFile, null);
 
-		} else if (archiveFs.getVerifyMethod() == Verify.Method.COPY_BACK) {
+		} else if (archiveFs.getVerifyMethod() == VerifyMethod.COPY_BACK) {
 
 			// Delete the existing temporary file
 			if (tarFile.exists()) {
@@ -261,23 +267,22 @@ public class Deposit implements ITaskAction {
 
 
 
-	private void checkUserStoreExists(UserStorage userStorage, DepositDetails depositDetails) throws DepositException {
+	private void checkUserStoreExists(UserStorage userStorage, DepositDetails depositDetails) {
 
 		if (!userStorage.getUserStore().exists(depositDetails.getFilePath())) {
-			String errMsg = "Deposit failed: file not found";
-			throw new DepositException(errMsg);
+			String errMsg = "User Store not found";
+			throw new DataVaultWorkerException(errMsg);
 		}
 	}
 
-	private Storage buildStorageConnections(Task task, DepositDetails depositDetails) throws DepositException {
+	private Storage buildStorageConnections(Task task, DepositDetails depositDetails) {
 		UserStorage userStorage = connectToUserStorage(task.getUserFileStore(), depositDetails);
 		ArchiveStore archiveFs = connectToArchiveStorage(task.getArchiveFileStore(), depositDetails);
 		Storage storage = new Storage(userStorage, archiveFs);
 		return storage;
 	}
 	
-	private UserStorage connectToUserStorage(FileStore userFileStore, DepositDetails depositDetails)
-			throws DepositException {
+	private UserStorage connectToUserStorage(FileStore userFileStore, DepositDetails depositDetails) {
 		// Connect to the user storage
 		try {
 			Class<?> clazz = Class.forName(userFileStore.getStorageClass());
@@ -289,13 +294,13 @@ public class Deposit implements ITaskAction {
 			return new UserStorage(userFs, userStore);
 
 		} catch (Exception e) {
-			String errMsg = "Deposit failed: could not access user filesystem";
-			throw new DepositException(errMsg, e);
+			String errMsg = "Could not access user filesystem";
+			throw new DataVaultWorkerException(errMsg, e);
 		}
 	}
 	
 	private ArchiveStore connectToArchiveStorage(org.datavaultplatform.common.model.ArchiveStore archiveFileStore,
-			DepositDetails depositDetails) throws DepositException {
+			DepositDetails depositDetails) {
 		// Connect to the archive storage
 		try {
 			Class<?> clazz = Class.forName(archiveFileStore.getStorageClass());
@@ -304,8 +309,8 @@ public class Deposit implements ITaskAction {
 					archiveFileStore.getProperties());
 			return (ArchiveStore) instance;
 		} catch (Exception e) {
-			String errMsg = "Deposit failed: could not access archive filesystem";
-			throw new DepositException(errMsg);
+			String errMsg = "Could not access archive filesystem";
+			throw new DataVaultWorkerException(errMsg);
 		}
 	}
 
@@ -313,7 +318,7 @@ public class Deposit implements ITaskAction {
 
 	private void processRedeliver(boolean isRedeliver) throws DepositException {
 		if (isRedeliver) {
-			String errMsg = "Deposit stopped: the message had been redelivered, please investigate";
+			String errMsg = "Deposit stopped - The message had been redelivered, please investigate";
 			throw new DepositException(errMsg);
 		}
 	}
@@ -339,6 +344,7 @@ public class Deposit implements ITaskAction {
 
 			// Compute bytes to copy
 			long expectedBytes = userStorage.getUserStore().getSize(depositDetails.getFilePath());
+			
 			eventStream.send(new ComputedSize(depositDetails.getJobId(), depositDetails.getDepositId(), expectedBytes)
 					.withUserId(depositDetails.getUserId()));
 
@@ -364,7 +370,7 @@ public class Deposit implements ITaskAction {
 				trackerThread.join();
 			}
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new DataVaultWorkerException(e.getMessage(), e);
 		}
 	}
 
@@ -391,7 +397,7 @@ public class Deposit implements ITaskAction {
 				trackerThread.join();
 			}
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new DataVaultWorkerException(e.getMessage(), e);
 		}
 
 		logger.info("Copied: " + progress.dirCount + " directories, " + progress.fileCount + " files, "
@@ -408,7 +414,7 @@ public class Deposit implements ITaskAction {
 		try {
 			((Device) archiveFs).retrieve(archiveId, tarFile, progress);
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new DataVaultWorkerException(e.getMessage(), e);
 		}
 		logger.info("Copied: " + progress.dirCount + " directories, " + progress.fileCount + " files, "
 				+ progress.byteCount + " bytes");
@@ -421,10 +427,10 @@ public class Deposit implements ITaskAction {
 
 		if (origTarHash != null) {
 			// Compare the SHA hash
-			String tarHash = Verify.getDigest(tarFile);
+			String tarHash = CheckSumUtil.getDigest(tarFile, tarCheckSumEnum);
 			logger.info("Checksum: " + tarHash);
 			if (!tarHash.equals(origTarHash)) {
-				throw new RuntimeException("checksum failed: " + tarHash + " != " + origTarHash);
+				throw new DataVaultWorkerException("Tar file checksum verificiation failed: " + tarHash + " != " + origTarHash);
 			}
 		}
 
@@ -433,35 +439,17 @@ public class Deposit implements ITaskAction {
 
 		// Validate the bagit directory
 		if (!packager.validateBag(bagDir.toPath())) {
-			throw new RuntimeException("Bag is invalid");
-		} else {
-			logger.info("Bag is valid");
+			throw new DataVaultWorkerException("Bag is invalid");
 		}
-
-		
-		try {
-
-			// Cleanup
-			logger.info("Cleaning up ... {}", bagDir);
-			if (DataVaultConstants.doTempDirectoryCleanUp) {
-				FileUtils.deleteDirectory(bagDir);
-			}
 			
-		} catch (IOException e) {
-			logger.error(e.getMessage());
-			throw new RuntimeException(e);
+		logger.info("Bag is valid");
+
+		if (DataVaultConstants.doTempDirectoryCleanUp) {
+			FileUtil.deleteDirectory(bagDir);
 		}
 		
 		tarFile.delete();
 	}
 	
-	private void deleteDirectory(File dir) throws DepositException {
-		// Cleanup
-		logger.info("Cleaning up ... deleting: {}", dir.getAbsolutePath());
-		try {
-			FileUtils.deleteDirectory(dir);
-		} catch (IOException io) {
-			throw new DepositException("Deposit failed: Failed to delete directory: " + dir.getAbsolutePath());
-		}
-	}
+
 }

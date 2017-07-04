@@ -4,21 +4,24 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 
 import javax.xml.bind.DatatypeConverter;
+import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 
 import org.datavaultplatform.common.storage.CheckSumEnum;
+import org.datavaultplatform.worker.exception.DataVaultWorkerException;
 
 import com.amazonaws.util.Md5Utils;
 
 import gov.loc.repository.bagit.Manifest.Algorithm;
 
-public final class ChecksumUtil {
+public final class CheckSumUtil {
 
-	private ChecksumUtil() {
+	private CheckSumUtil() {
 	}
 	
 	//CompleterHelper
@@ -52,7 +55,7 @@ public final class ChecksumUtil {
 				hash = org.apache.commons.codec.digest.DigestUtils.sha512Hex(fis);
 			}
 		} catch (IOException e) {
-			throw new RuntimeException(e);
+			throw new DataVaultWorkerException(e);
 		}
 		return hash;
 	}
@@ -65,7 +68,7 @@ public final class ChecksumUtil {
 				checksum = DatatypeConverter.printHexBinary(Md5Utils.computeMD5Hash(path.toFile()));
 			}
 		} catch (IOException e) {
-			throw new RuntimeException(e);
+			throw new DataVaultWorkerException(e);
 		}
 		return checksum;
 	}
@@ -77,7 +80,7 @@ public final class ChecksumUtil {
 			byte[] hash = MessageDigest.getInstance(alg.MD5.name()).digest(b);
 			checksum = DatatypeConverter.printHexBinary(hash);
 		} catch (Exception e) {
-			throw new RuntimeException(e);
+			throw new DataVaultWorkerException(e);
 		}
 		return checksum;
 	}
@@ -108,6 +111,25 @@ public final class ChecksumUtil {
         return hash;
     }
     
+    public static String getDigest(File file, CheckSumEnum algorithm) {
 
+    	try {
+        MessageDigest sha1 = MessageDigest.getInstance(algorithm.getJavaSecurityAlgorithm());
+        
+        try (InputStream is = new FileInputStream(file)) {
+            byte[] buffer = new byte[8192];
+            int len = is.read(buffer);
+
+            while (len != -1) {
+                sha1.update(buffer, 0, len);
+                len = is.read(buffer);
+            }
+            
+            return new HexBinaryAdapter().marshal(sha1.digest());
+        }
+    	} catch (Exception e) {
+    		throw new DataVaultWorkerException(e.getMessage(), e);
+    	}
+    }
 	
 }

@@ -17,8 +17,8 @@ import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.model.FileInfo;
 import org.datavaultplatform.common.storage.ArchiveStore;
 import org.datavaultplatform.common.storage.Device;
+import org.datavaultplatform.common.storage.VerifyMethod;
 import org.datavaultplatform.common.storage.UserStore;
-import org.datavaultplatform.common.storage.Verify;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,7 +158,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
     }
     
     @Override
-    public Verify.Method getVerifyMethod() {
+    public VerifyMethod getVerifyMethod() {
         // Return the default verification method (copy back and check)
         return verificationMethod;
     }

@@ -11,5 +11,6 @@ public class DataVaultConstants {
 	public static final String TAG_MANIFEST_FILE = "tagmanifest.txt";
 	public static final String NEW_LINE = "\n";
 	
-	public static final CheckSumEnum checkSumEnum = CheckSumEnum.MD5;
+	public static final CheckSumEnum CHECKSUM_ENUM = CheckSumEnum.MD5;
+	public static final CheckSumEnum TAR_CHECKSUM_ENUM = CheckSumEnum.SHA1;
 }

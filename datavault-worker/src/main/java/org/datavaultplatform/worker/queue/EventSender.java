@@ -29,7 +29,7 @@ public class EventSender implements EventStream {
     @Value("${queue.password}")
     private String queuePassword;
     
-    //TODO this is bad
+    //TODO this is bad as this is a singleton class
     private int sequence = 0;
     
     @Override

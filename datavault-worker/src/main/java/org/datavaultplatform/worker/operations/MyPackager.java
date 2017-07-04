@@ -13,9 +13,9 @@ import java.util.Iterator;
 import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.storage.CheckSumEnum;
 import org.datavaultplatform.worker.model.FileDetails;
-import org.datavaultplatform.worker.util.ChecksumUtil;
+import org.datavaultplatform.worker.util.CheckSumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
-import org.datavaultplatform.worker.util.FileWriterUtil;
+import org.datavaultplatform.worker.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,11 +41,10 @@ public class MyPackager implements IPackager {
 
 		String manifestChecksum = manifestGenerator.generate(bagDirectory, dataDirectory);
 		File tagManifestFile = bagDirectory.resolve(DataVaultConstants.TAG_MANIFEST_FILE).toFile();
-		FileWriterUtil.writeToFile(tagManifestFile, manifestChecksum + "," + DataVaultConstants.MANIFEST_FILE_NAME + ","
+		FileUtil.writeToFile(tagManifestFile, manifestChecksum + "," + DataVaultConstants.MANIFEST_FILE_NAME + ","
 				+ getCheckSumEnum() + DataVaultConstants.NEW_LINE);
 
-		// this return is simply due to the Bagit Packager having a return
-		// boolean
+		// this return is simply due to the Bagit Packager having a return boolean
 		// although the return value from bagit packager is not used
 		return true;
 	}
@@ -71,7 +70,7 @@ public class MyPackager implements IPackager {
 				if (Files.isDirectory(file)) {
 					listFiles(bagDirectory, file, manifestFile);
 				} else {
-					FileDetails fileDetails = new FileDetails(file, ChecksumUtil.generateCheckSum(file, getCheckSumEnum()));
+					FileDetails fileDetails = new FileDetails(file, CheckSumUtil.generateCheckSum(file, getCheckSumEnum()));
 					//verify checksum
 					validateCheckSum(bagDirectory, manifestFile, fileDetails);
 				}
@@ -226,7 +225,7 @@ public class MyPackager implements IPackager {
 
 		Path metadataFile = metadataDirPath.resolve(metadataFileName);
 		FileUtils.writeStringToFile(metadataFile.toFile(), metadata);
-		String hash = ChecksumUtil.generateCheckSum(metadataFile, checkSumEnum);
+		String hash = CheckSumUtil.generateCheckSum(metadataFile, checkSumEnum);
 		FileUtils.writeStringToFile(tagManifest, hash + "," + metadataDirName + "/" + metadataFileName + ","
 				+ checkSumEnum + DataVaultConstants.NEW_LINE, true);
 	}
@@ -284,11 +283,11 @@ public class MyPackager implements IPackager {
 	public void addTarfileChecksum(Path bagDirectory, Path tarfile, String tarHash, CheckSumEnum tarHashAlgorithm) {
 
 		File tagManifestFile = bagDirectory.resolve(DataVaultConstants.TAG_MANIFEST_FILE).toFile();
-		FileWriterUtil.writeToFile(tagManifestFile, tarHash + "," + tarfile.getFileName() + ","
+		FileUtil.writeToFile(tagManifestFile, tarHash + "," + tarfile.getFileName() + ","
 				+ tarHashAlgorithm.getJavaSecurityAlgorithm() + DataVaultConstants.NEW_LINE);
 	}
 
 	private CheckSumEnum getCheckSumEnum() {
-		return DataVaultConstants.checkSumEnum;
+		return DataVaultConstants.CHECKSUM_ENUM;
 	}
 }

@@ -1,3 +1,4 @@
+
 package org.datavaultplatform.worker.operations;
 
 import java.io.File;
@@ -10,9 +11,9 @@ import java.util.List;
 
 import org.datavaultplatform.common.storage.CheckSumEnum;
 import org.datavaultplatform.worker.model.FileDetails;
-import org.datavaultplatform.worker.util.ChecksumUtil;
+import org.datavaultplatform.worker.util.CheckSumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
-import org.datavaultplatform.worker.util.FileWriterUtil;
+import org.datavaultplatform.worker.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,7 @@ public class ManifestChunkedGenerator implements ManifestGenerator {
 		logger.debug("Creating Bag: {}, {}", bagDirectory, dataDirectory);
 
 		Path manifestPath = writeManifestFile(bagDirectory, dataDirectory);
-		String manifestChecksum = ChecksumUtil.generateCheckSum(manifestPath, getCheckSumEnum());
+		String manifestChecksum = CheckSumUtil.generateCheckSum(manifestPath, getCheckSumEnum());
 		return manifestChecksum;
 	}
 
@@ -50,7 +51,7 @@ public class ManifestChunkedGenerator implements ManifestGenerator {
 				if (Files.isDirectory(entry)) {
 					listFiles(entry, fileDetailsList, bagDirectory, manifestFile);
 				} else {
-					FileDetails fileDetails = new FileDetails(entry, ChecksumUtil.generateCheckSum(entry, getCheckSumEnum()));
+					FileDetails fileDetails = new FileDetails(entry, CheckSumUtil.generateCheckSum(entry, getCheckSumEnum()));
 					fileDetailsList.add(fileDetails);
 				}
 				
@@ -69,11 +70,11 @@ public class ManifestChunkedGenerator implements ManifestGenerator {
 	private void writeListToFile(Path bagDirectory, File manifestFile, final List<FileDetails> fileDetailsList) {
 		fileDetailsList.stream().forEach(file -> {
 			String line = file.getCheckSum() + "," + file.getFilePath(bagDirectory) + "," + getCheckSumEnum() + DataVaultConstants.NEW_LINE;
-			FileWriterUtil.writeToFile(manifestFile, line);
+			FileUtil.writeToFile(manifestFile, line);
 		});
 	}
 	
 	private CheckSumEnum getCheckSumEnum() {
-		return DataVaultConstants.checkSumEnum;
+		return DataVaultConstants.CHECKSUM_ENUM;
 	}
 }
