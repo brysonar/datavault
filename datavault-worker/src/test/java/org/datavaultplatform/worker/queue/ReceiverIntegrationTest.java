@@ -20,7 +20,6 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 @ContextConfiguration(locations = {
         "classpath:datavault-worker.xml"})
 public class ReceiverIntegrationTest {
-
 	
 	@Value("${tempDir}")
     private String tempDir;
