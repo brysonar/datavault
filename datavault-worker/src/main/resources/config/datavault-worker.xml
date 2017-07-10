@@ -30,10 +30,10 @@
 	<bean id="eventSender" class="org.datavaultplatform.worker.queue.EventSender" />
 
  <!-- 
-	<bean id="packager" class="org.datavaultplatform.worker.operations.Packager" />
+	<bean id="packager" class="org.datavaultplatform.worker.operations.BagitPackager" />
  -->
 
-	<bean id="packager" class="org.datavaultplatform.worker.operations.MyPackager" />
+	<bean id="packager" class="org.datavaultplatform.worker.operations.Packager" />
 
 
  	<bean id="manifestGenerator" class="org.datavaultplatform.worker.operations.ManifestChunkedGenerator" />
