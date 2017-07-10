@@ -51,6 +51,8 @@ public class Packager implements IPackager {
 	}
 
 	// Validate an existing bag
+	// bagDirectory - \tmp\datavault\temp\14980@DESKTOP-SUUCVAS\f8e65b18-756a-4b48-b26f-7b4eafa5c714
+	// this is called by deposit after untaring archived file back to tmp directory and then validating it by comparing to manifest
 	@Override
 	public boolean validateBag(Path bagDirectory) {
 
@@ -59,20 +61,19 @@ public class Packager implements IPackager {
 		Path manifestPath = bagDirectory.resolve(DataVaultConstants.MANIFEST_FILE_NAME);
 		Path tempBagDataPath = bagDirectory.resolve(DataVaultConstants.DATA);
 		logger.debug("tempBagDataPath - {}", tempBagDataPath);
-		// validate checksum of each file
-		listFiles(bagDirectory, tempBagDataPath, manifestPath);
+		// validate checksum of each file against value in manifest file
+		validateCheckSumOfFiles(bagDirectory, tempBagDataPath, manifestPath);
 		return true;
 	}
 
-	private void listFiles(final Path bagDirectory, final Path dataDirectory, final Path manifestFile) {
+	private void validateCheckSumOfFiles(final Path bagDirectory, final Path dataDirectory, final Path manifestFile) {
 		
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dataDirectory)) {
 			for (Path file : stream) {
 				if (Files.isDirectory(file)) {
-					listFiles(bagDirectory, file, manifestFile);
+					validateCheckSumOfFiles(bagDirectory, file, manifestFile);
 				} else {
 					FileDetails fileDetails = new FileDetails(file, CheckSumUtil.generateCheckSum(file, getCheckSumEnum()));
-					//verify checksum
 					validateCheckSum(bagDirectory, manifestFile, fileDetails);
 				}
 			}
@@ -89,11 +90,11 @@ public class Packager implements IPackager {
 		try (BufferedReader reader = Files.newBufferedReader(manifestFile, Charset.forName("UTF-8"))) {
 
 			String currentLine = null;
-
 			while ((currentLine = reader.readLine()) != null) {
 
 				String[] fields = currentLine.split(",");
 
+				//fields[1] is the file name with path eg /data/subdirectories/filename
 				if (fields[1].equals(fileDetails.getFilePath(bagDirectory))) {
 					fileFound = true;
 					if (!fields[0].equals(fileDetails.getCheckSum())) {
@@ -103,7 +104,6 @@ public class Packager implements IPackager {
 						logger.trace("Checksum for " + fileDetails.getFilePath(bagDirectory) + " matches");
 					}
 				}
-
 			}
 
 		} catch (IOException e) {
@@ -114,22 +114,44 @@ public class Packager implements IPackager {
 			throw new RuntimeException("Could not find meta data checkum for " + fileDetails.getFilePath(bagDirectory));
 
 		}
-
 	}
 
-	// this seems to keep a lock and therefore does not clean up delete
 	private void validateCheckSum2(final Path bagDirectory, final Path manifestFile, final FileDetails fileDetails) {
+		logger.debug("validateCheckSum");
+
+		try (Stream<String> stream = Files.lines(manifestFile)) {
+			
+			stream.forEach(line -> {
+
+				String[] fields = line.split(",");
+
+				//fields[1] is the file name with path eg /data/subdirectories/filename
+				if (fields[1].equals(fileDetails.getFilePath(bagDirectory))) {
+					if (!fields[0].equals(fileDetails.getCheckSum())) {
+						throw new RuntimeException("Checksum for " + fileDetails.getFilePath(bagDirectory)
+								+ " does not match " + fields[0] + " != " + fileDetails.getCheckSum());
+					} else {
+						logger.trace("Checksum for " + fileDetails.getFilePath(bagDirectory) + " matches");
+					}
+				}
+			});// print each line
+
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private void validateCheckSum3(final Path bagDirectory, final Path manifestFile, final FileDetails fileDetails) {
 		logger.debug("validateCheckSum");
 
 		boolean fileFound = false;
 
-		try {
-			
-		//	Files.lines(manifestFile).
-			Iterator<String> i = Files.lines(manifestFile).iterator();
-			while (i.hasNext()) {
+		try (Stream<String> streams = Files.lines(manifestFile)) {
 
-				String[] fields = i.next().split(",");
+			Iterator<String> iterator = streams.iterator();
+			while (iterator.hasNext()) {
+
+				String[] fields = iterator.next().split(",");
 
 				if (fields[1].equals(fileDetails.getFilePath(bagDirectory))) {
 					fileFound = true;
@@ -151,30 +173,7 @@ public class Packager implements IPackager {
 
 	}
 	
-	private void validateCheckSum3(final Path bagDirectory, final Path manifestFile, final FileDetails fileDetails) {
-		logger.debug("validateCheckSum");
 
-		try (Stream<String> stream = Files.lines(manifestFile)) {
-			stream.forEach(line -> {
-
-				String[] fields = line.split(",");
-
-				if (fields[1].equals(fileDetails.getFilePath(bagDirectory))) {
-					logger.debug("matches yeah");
-					if (!fields[0].equals(fileDetails.getCheckSum())) {
-						throw new RuntimeException("Checksum for " + fileDetails.getFilePath(bagDirectory)
-								+ " does not match " + fields[0] + " != " + fileDetails.getCheckSum());
-					} else {
-						logger.trace("Checksum for " + fileDetails.getFilePath(bagDirectory) + " matches");
-					}
-				}
-			});// print each line
-
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-
-	}
 	
 	// Add vault/deposit metadata
 	@Override
