@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.DirectoryStream;
@@ -22,6 +21,8 @@ import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.model.FileInfo;
 import org.datavaultplatform.common.storage.Device;
 import org.datavaultplatform.common.storage.UserStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.dropbox.core.DbxAccountInfo;
 import com.dropbox.core.DbxClient;
@@ -37,16 +38,18 @@ import com.dropbox.core.DbxWriteMode;
 
 public class DropboxFileSystem extends Device implements UserStore {
 
-    private final String dbxAppName = "DataVault/1.0";
-    private final String PATH_SEPARATOR = "/";
-    private static final long FILE_COPY_BUFFER_SIZE = FileCopy.ONE_KB * 64;
+	private static final Logger logger = LoggerFactory.getLogger(DropboxFileSystem.class);
+
+	private final String dbxAppName = "DataVault/1.0";
+	private final String PATH_SEPARATOR = "/";
+	private static final long FILE_COPY_BUFFER_SIZE = FileCopy.ONE_KB * 64;
+
+	private final DbxRequestConfig dbxConfig;
+	private final DbxClient dbxClient;
+
+	private String accessToken = null;
     
-    private final DbxRequestConfig dbxConfig;
-    private final DbxClient dbxClient;
-    
-    private String accessToken = null;
-    
-    public DropboxFileSystem(String name, Map<String,String> config) throws IOException, DbxException  {
+    public DropboxFileSystem(String name, Map<String,String> config)  {
         super(name, config);
         
         // Unpack the config parameters (in an implementation-specific way)
@@ -56,7 +59,12 @@ public class DropboxFileSystem extends Device implements UserStore {
         dbxClient = new DbxClient(dbxConfig, accessToken);
         
         // Verify parameters are correct.
-        System.out.println("Connected to Dropbox account: " + dbxClient.getAccountInfo().displayName);
+        try {
+			logger.info("Connected to Dropbox account: " + dbxClient.getAccountInfo().displayName);
+		} catch (DbxException e) {
+			logger.error(e.getMessage(), e);
+			throw new DataVaultException(e);
+		}
     }
     
 	@Override

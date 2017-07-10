@@ -1,11 +1,9 @@
 package org.datavaultplatform.worker.tasks;
 
 import java.io.File;
-import java.lang.reflect.Constructor;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.event.Error;
@@ -23,7 +21,7 @@ import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.model.FileStore;
 import org.datavaultplatform.common.storage.ArchiveStore;
 import org.datavaultplatform.common.storage.CheckSumEnum;
-import org.datavaultplatform.common.storage.Device;
+import org.datavaultplatform.common.storage.StorageFactory;
 import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.storage.VerifyMethod;
 import org.datavaultplatform.common.task.Context;
@@ -33,7 +31,6 @@ import org.datavaultplatform.worker.exception.DepositException;
 import org.datavaultplatform.worker.model.DepositDetails;
 import org.datavaultplatform.worker.model.MetaData;
 import org.datavaultplatform.worker.model.Storage;
-import org.datavaultplatform.worker.model.UserStorage;
 import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.Identifier;
 import org.datavaultplatform.worker.operations.ProgressTracker;
@@ -56,15 +53,17 @@ public class Deposit implements ITaskAction {
 
 	private final IPackager packager;
 	private final EventStream eventStream;
+    private final StorageFactory storageFactory;
 
 	//public final CheckSumEnum checkSumEnum = DataVaultConstants.CHECKSUM_ENUM;
 	public final CheckSumEnum tarCheckSumEnum = DataVaultConstants.TAR_CHECKSUM_ENUM;
 	
 	@Autowired
-	public Deposit(IPackager packager, EventStream eventStream) {
+	public Deposit(IPackager packager, StorageFactory storageFactory, EventStream eventStream) {
 		super();
 		this.packager = packager;
 		this.eventStream = eventStream;
+		this.storageFactory = storageFactory;
 	}
 
 	@Override
@@ -108,9 +107,9 @@ public class Deposit implements ITaskAction {
 
 		logger.info("Bag Id: {}, Deposit file: {}", depositDetails.getBagId(), depositDetails.getFilePath());
 
-		Storage storage = buildStorageConnections(task, depositDetails);
+		Storage storage = buildStorageConnections(task);
 
-		checkUserStoreExists(storage.getUserStorage(), depositDetails);
+		checkUserStoreExists(storage.getUserStore(), depositDetails);
 
 		Path tempBagPath = createTempBagDirectory(context.getTempDir(), depositDetails);
 
@@ -120,7 +119,7 @@ public class Deposit implements ITaskAction {
 
 		Path tempBagDataPath = createTempBagDataDirectory(tempBagPath);
 
-		copyFromUserStorageToTempDataDirectory(storage.getUserStorage(), depositDetails, tempBagDataPath);
+		copyFromUserStorageToTempDataDirectory(storage.getUserStore(), depositDetails, tempBagDataPath);
 
 		// Bag the directory in-place
 		eventStream.send(new TransferComplete(depositDetails.getJobId(), depositDetails.getDepositId())
@@ -151,7 +150,7 @@ public class Deposit implements ITaskAction {
 
 		copyToMetaDirectory(context, depositDetails, tempBagPath.toFile());
 
-		String archiveId = copyTarToArchiveStorage(storage.getArchiveFs(), depositDetails, tarFile);
+		String archiveId = copyTarToArchiveStorage(storage.getArchiveStore(), depositDetails, tarFile);
 
 		// TODO there is multiple deletes of this directory - see verify archive
 		//if (DataVaultConstants.doTempDirectoryCleanUp) {
@@ -240,7 +239,7 @@ public class Deposit implements ITaskAction {
 	private void verifyArchive(Context context, Storage storage, File tarFile, String tarHash, String archiveId) {
 		logger.info("Verifying archive package ...");
 
-		ArchiveStore archiveFs = storage.getArchiveFs();
+		ArchiveStore archiveFs = storage.getArchiveStore();
 
 		logger.info("Verification method: " + archiveFs.getVerifyMethod());
 
@@ -258,7 +257,7 @@ public class Deposit implements ITaskAction {
 			}
 
 			// Copy file back from the archive storage
-			copyBackFromArchive(storage.getArchiveFs(), archiveId, tarFile);
+			copyBackFromArchive(storage.getArchiveStore(), archiveId, tarFile);
 
 			// Verify the contents
 			verifyTarFile(context.getTempDir(), tarFile, tarHash);
@@ -267,53 +266,32 @@ public class Deposit implements ITaskAction {
 
 
 
-	private void checkUserStoreExists(UserStorage userStorage, DepositDetails depositDetails) {
+	private void checkUserStoreExists(UserStore userStore, DepositDetails depositDetails) {
 
-		if (!userStorage.getUserStore().exists(depositDetails.getFilePath())) {
+		if (!userStore.exists(depositDetails.getFilePath())) {
 			String errMsg = "User Store not found";
 			throw new DataVaultWorkerException(errMsg);
 		}
 	}
 
-	private Storage buildStorageConnections(Task task, DepositDetails depositDetails) {
-		UserStorage userStorage = connectToUserStorage(task.getUserFileStore(), depositDetails);
-		ArchiveStore archiveFs = connectToArchiveStorage(task.getArchiveFileStore(), depositDetails);
-		Storage storage = new Storage(userStorage, archiveFs);
+	private Storage buildStorageConnections(Task task) {
+		UserStore userStore = getUserStorage(task.getUserFileStore());
+		ArchiveStore archiveStore = getArchiveStorage(task.getArchiveFileStore());
+		Storage storage = new Storage(userStore, archiveStore);
 		return storage;
 	}
 	
-	private UserStorage connectToUserStorage(FileStore userFileStore, DepositDetails depositDetails) {
+	private UserStore getUserStorage(FileStore userFileStore) {
 		// Connect to the user storage
-		try {
-			Class<?> clazz = Class.forName(userFileStore.getStorageClass());
-			Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
-			Object instance = constructor.newInstance(userFileStore.getStorageClass(), userFileStore.getProperties());
-
-			Device userFs = (Device) instance;
-			UserStore userStore = (UserStore) userFs;
-			return new UserStorage(userFs, userStore);
-
-		} catch (Exception e) {
-			String errMsg = "Could not access user filesystem";
-			throw new DataVaultWorkerException(errMsg, e);
-		}
+//        return getUserStorage(userFileStore);
+		return storageFactory.getUserStore(userFileStore.getStorageClass(), userFileStore.getStorageClass(), userFileStore.getProperties());
 	}
 	
-	private ArchiveStore connectToArchiveStorage(org.datavaultplatform.common.model.ArchiveStore archiveFileStore,
-			DepositDetails depositDetails) {
+	private ArchiveStore getArchiveStorage(org.datavaultplatform.common.model.ArchiveStore archiveFileStore) {
 		// Connect to the archive storage
-		try {
-			Class<?> clazz = Class.forName(archiveFileStore.getStorageClass());
-			Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
-			Object instance = constructor.newInstance(archiveFileStore.getStorageClass(),
-					archiveFileStore.getProperties());
-			return (ArchiveStore) instance;
-		} catch (Exception e) {
-			String errMsg = "Could not access archive filesystem";
-			throw new DataVaultWorkerException(errMsg);
-		}
+		// return storageFactory.getArchiveStorage(archiveFileStore);
+		return storageFactory.getArchiveStorage(archiveFileStore.getStorageClass(), archiveFileStore.getStorageClass(), archiveFileStore.getProperties());
 	}
-
 
 
 	private void processRedeliver(boolean isRedeliver) throws DepositException {
@@ -334,16 +312,16 @@ public class Deposit implements ITaskAction {
 		return states;
 	}
 
-	private void copyFromUserStorageToTempDataDirectory(UserStorage userStorage, DepositDetails depositDetails,
+	private void copyFromUserStorageToTempDataDirectory(UserStore userStore, DepositDetails depositDetails,
 			Path bagDataPath) {
 
 		logger.info("Copying target from: {}, to bag directory: {}", depositDetails.getFilePath(), bagDataPath);
 		try {
-			String fileName = userStorage.getUserStore().getName(depositDetails.getFilePath());
+			String fileName = userStore.getName(depositDetails.getFilePath());
 			File outputFile = bagDataPath.resolve(fileName).toFile();
 
 			// Compute bytes to copy
-			long expectedBytes = userStorage.getUserStore().getSize(depositDetails.getFilePath());
+			long expectedBytes = userStore.getSize(depositDetails.getFilePath());
 			
 			eventStream.send(new ComputedSize(depositDetails.getJobId(), depositDetails.getDepositId(), expectedBytes)
 					.withUserId(depositDetails.getUserId()));
@@ -363,7 +341,7 @@ public class Deposit implements ITaskAction {
 
 			try {
 				// Ask the driver to copy files to our working directory
-				userStorage.getUserFs().retrieve(depositDetails.getFilePath(), outputFile, progress);
+				userStore.retrieve(depositDetails.getFilePath(), outputFile, progress);
 			} finally {
 				// Stop the tracking thread
 				tracker.stop();
@@ -374,7 +352,7 @@ public class Deposit implements ITaskAction {
 		}
 	}
 
-	private String copyTarToArchiveStorage(ArchiveStore archiveFs, DepositDetails depositDetails, File tarFile) {
+	private String copyTarToArchiveStorage(ArchiveStore archiveStore, DepositDetails depositDetails, File tarFile) {
 
 		// Copy the resulting tar file to the archive area
 		logger.info("Copying tar file to archive ...");
@@ -390,7 +368,7 @@ public class Deposit implements ITaskAction {
 
 		try {
 			try {
-				archiveId = ((Device) archiveFs).store("/", tarFile, progress);
+				archiveId = archiveStore.store("/", tarFile, progress);
 			} finally {
 				// Stop the tracking thread
 				tracker.stop();
@@ -406,13 +384,13 @@ public class Deposit implements ITaskAction {
 		return archiveId;
 	}
 
-	private void copyBackFromArchive(ArchiveStore archiveFs, String archiveId, File tarFile) {
+	private void copyBackFromArchive(ArchiveStore archiveStore, String archiveId, File tarFile) {
 
 		// Ask the driver to copy files to the temp directory
 		Progress progress = new Progress();
 
 		try {
-			((Device) archiveFs).retrieve(archiveId, tarFile, progress);
+			archiveStore.retrieve(archiveId, tarFile, progress);
 		} catch (Exception e) {
 			throw new DataVaultWorkerException(e.getMessage(), e);
 		}

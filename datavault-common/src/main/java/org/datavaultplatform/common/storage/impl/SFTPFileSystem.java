@@ -44,7 +44,7 @@ public class SFTPFileSystem extends Device implements UserStore {
     
     private Utility.SFTPMonitor monitor = null;
     
-    public SFTPFileSystem(String name, Map<String,String> config) throws Exception {
+    public SFTPFileSystem(String name, Map<String,String> config) {
         super(name, config);
         
         // Unpack the config parameters (in an implementation-specific way)

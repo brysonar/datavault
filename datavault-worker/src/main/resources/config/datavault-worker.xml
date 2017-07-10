@@ -45,6 +45,10 @@
      <bean id="retrieve" class="org.datavaultplatform.worker.tasks.Retrieve" />
 
      <bean id="deposit" class="org.datavaultplatform.worker.tasks.Deposit" />
+     
+     <bean id="storageFactory" class="org.datavaultplatform.common.storage.StorageFactory" />
+     
+     
  
  
 </beans>

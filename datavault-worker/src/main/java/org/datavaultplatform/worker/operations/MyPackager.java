@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
+import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.storage.CheckSumEnum;
@@ -153,8 +154,8 @@ public class MyPackager implements IPackager {
 	private void validateCheckSum3(final Path bagDirectory, final Path manifestFile, final FileDetails fileDetails) {
 		logger.debug("validateCheckSum");
 
-		try {
-			Files.lines(manifestFile).forEach(line -> {
+		try (Stream<String> stream = Files.lines(manifestFile)) {
+			stream.forEach(line -> {
 
 				String[] fields = line.split(",");
 

@@ -117,6 +117,7 @@
             </resource>
         </resources>
 
+<!-- 
         <plugins>
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
@@ -136,6 +137,7 @@
                 </executions>
             </plugin>
         </plugins>
+         -->
     </build>
 
 

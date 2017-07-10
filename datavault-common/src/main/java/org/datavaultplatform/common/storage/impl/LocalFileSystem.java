@@ -12,13 +12,14 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.datavaultplatform.common.exception.DataVaultException;
 import org.datavaultplatform.common.io.FileCopy;
 import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.model.FileInfo;
 import org.datavaultplatform.common.storage.ArchiveStore;
 import org.datavaultplatform.common.storage.Device;
-import org.datavaultplatform.common.storage.VerifyMethod;
 import org.datavaultplatform.common.storage.UserStore;
+import org.datavaultplatform.common.storage.VerifyMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +29,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
 	 
     private String rootPath = null;
     
-    public LocalFileSystem(String name, Map<String,String> config) throws FileNotFoundException {
+    public LocalFileSystem(String name, Map<String,String> config) {
         super(name, config);
         
         // Unpack the config parameters (in an implementation-specific way)
@@ -37,7 +38,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
         // Verify parameters are correct.
         File file = new File(rootPath);
         if (!file.exists()) {
-            throw new FileNotFoundException(rootPath);
+            throw new DataVaultException("File not found: " + rootPath, new FileNotFoundException(rootPath));
         }
     }
     
@@ -124,37 +125,37 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
     }
 
     @Override
-    public void retrieve(String path, File working, Progress progress) throws Exception {
+    public void retrieve(String srcFileDirectoryName, File destination, Progress progress) throws Exception {
     	
-    	logger.debug("Local File System retrieve - path: {}", path);
+    	logger.debug("Local File System retrieve - path: {} to {}", srcFileDirectoryName, destination.getAbsolutePath());
     	
-        Path absolutePath = getAbsolutePath(path);
-        File file = absolutePath.toFile();
+        Path srcPath = getAbsolutePath(srcFileDirectoryName);
+        File srcfile = srcPath.toFile();
         
-        if (file.isFile()) {
-        	logger.debug("Local File System retrieve - copying file: {}", file.getAbsolutePath());
-            FileCopy.copyFile(progress, file, working);
-        } else if (file.isDirectory()) {
-        	logger.debug("Local File System retrieve - copying directory: {}", file.getAbsolutePath());
-            FileCopy.copyDirectory(progress, file, working);
+        if (srcfile.isFile()) {
+        	logger.debug("Local File System retrieve - copying file: {}", srcPath);
+            FileCopy.copyFile(progress, srcfile, destination);
+        } else if (srcfile.isDirectory()) {
+        	logger.debug("Local File System retrieve - copying directory: {}", srcPath);
+            FileCopy.copyDirectory(progress, srcfile, destination);
         }
     }
 
     @Override
-    public String store(String path, File working, Progress progress) throws Exception {
+    public String store(String destination, File srcFile, Progress progress) throws Exception {
     	
-    	logger.debug("Local File System store - path: {}", path);
+    	logger.debug("Local File System store - path: {}", destination);
     	
-        Path absolutePath = getAbsolutePath(path);
-        File retrieveFile = absolutePath.resolve(working.getName()).toFile();
+        Path destinationPath = getAbsolutePath(destination);
+        File destinationFile = destinationPath.resolve(srcFile.getName()).toFile();
         
-        if (working.isFile()) {
-            FileCopy.copyFile(progress, working, retrieveFile);
-        } else if (working.isDirectory()) {
-            FileCopy.copyDirectory(progress, working, retrieveFile);
+        if (srcFile.isFile()) {
+            FileCopy.copyFile(progress, srcFile, destinationFile);
+        } else if (srcFile.isDirectory()) {
+            FileCopy.copyDirectory(progress, srcFile, destinationFile);
         }
         
-        return working.getName();
+        return srcFile.getName();
     }
     
     @Override

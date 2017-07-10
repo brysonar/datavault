@@ -6,7 +6,7 @@ import java.util.List;
 import org.datavaultplatform.common.model.FileInfo;
 
 
-public interface UserStore {
+public interface UserStore extends Storage {
     
     // Properties and methods relating to user storage
     

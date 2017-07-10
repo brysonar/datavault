@@ -1,11 +1,8 @@
 package org.datavaultplatform.worker.tasks;
 
 import java.io.File;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.event.Error;
@@ -15,14 +12,15 @@ import org.datavaultplatform.common.event.UpdateProgress;
 import org.datavaultplatform.common.event.retrieve.RetrieveComplete;
 import org.datavaultplatform.common.event.retrieve.RetrieveStart;
 import org.datavaultplatform.common.io.Progress;
+import org.datavaultplatform.common.model.FileStore;
+import org.datavaultplatform.common.storage.ArchiveStore;
 import org.datavaultplatform.common.storage.CheckSumEnum;
-import org.datavaultplatform.common.storage.Device;
+import org.datavaultplatform.common.storage.StorageFactory;
 import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.task.Context;
 import org.datavaultplatform.common.task.Task;
 import org.datavaultplatform.worker.exception.RetrieveException;
 import org.datavaultplatform.worker.model.RetrieveDetails;
-import org.datavaultplatform.worker.model.UserStorage;
 import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.ProgressTracker;
 import org.datavaultplatform.worker.operations.Tar;
@@ -40,12 +38,14 @@ public class Retrieve implements ITaskAction {
 	
 	private final IPackager packager;
 	private final EventStream eventStream;
+    private final StorageFactory storageFactory;
 	
 	@Autowired
-	public Retrieve(IPackager packager, EventStream eventStream) {
+	public Retrieve(IPackager packager,  StorageFactory storageFactory, EventStream eventStream) {
 		super();
 		this.packager = packager;
 		this.eventStream = eventStream;
+		this.storageFactory = storageFactory;
 	}
 
 	
@@ -70,37 +70,38 @@ public class Retrieve implements ITaskAction {
 	}
     
 	
-    private void doAction(Context context, Task task, RetrieveDetails retrieveDetais) throws RetrieveException {
+    private void doAction(Context context, Task task, RetrieveDetails retrieveDetails) throws RetrieveException {
 
         stopProcessingIfRedeliver(task);
         
         ArrayList<String> states = buildStates();
         
-        eventStream.send(new InitStates(task.getJobID(), retrieveDetais.getDepositId(), states)
-            .withUserId(retrieveDetais.getUserID()));
+        eventStream.send(new InitStates(task.getJobID(), retrieveDetails.getDepositId(), states)
+            .withUserId(retrieveDetails.getUserID()));
         
-        eventStream.send(new RetrieveStart(task.getJobID(), retrieveDetais.getDepositId(), retrieveDetais.getRetrieveId())
-            .withUserId(retrieveDetais.getUserID())
+        eventStream.send(new RetrieveStart(task.getJobID(), retrieveDetails.getDepositId(), retrieveDetails.getRetrieveId())
+            .withUserId(retrieveDetails.getUserID())
             .withNextState(0));
         
-        logger.info("BagId: {}, retrievePath", retrieveDetais.getBagId(), retrieveDetais.getRetrievePath());
-
-        UserStorage userStorage = connectToUserStorage(task);
-        Device archiveFs = connectToArchiveStorage(task);
+        logger.info("BagId: {}, retrievePath", retrieveDetails.getBagId(), retrieveDetails.getRetrievePath());
 
         try {
-            validateTargetDirectory(retrieveDetais, userStorage);
-            validateEnoughFreeSpace(task, retrieveDetais, userStorage);
+        	
+            UserStore userStore = getUserStorage(task.getUserFileStore());
+            ArchiveStore archiveStore = getArchiveStorage(task.getArchiveFileStore());
+            
+            validateTargetDirectory(retrieveDetails, userStore);
+            validateEnoughFreeSpace(task, retrieveDetails, userStore);
 
             // Retrieve the archived data
-            String tarFileName = retrieveDetais.getBagId() + ".tar";
+            String tarFileName = retrieveDetails.getBagId() + ".tar";
             
             // Copy the tar file from the archive to the temporary area
             Path tarTempPath = context.getTempDir().resolve(tarFileName);
             File tarTempFile = tarTempPath.toFile();
 
-			copyFilesToTempDirectory(task, retrieveDetais, archiveFs, tarTempFile);
-            validateTarChecksum(task, retrieveDetais, tarTempFile);
+            copyArchivedFilesToTempDirectory(task, retrieveDetails, archiveStore, tarTempFile);
+            validateTarChecksum(task, retrieveDetails, tarTempFile);
             
             // Decompress to the temporary directory
             File bagDir = Tar.unTar(tarTempFile, context.getTempDir());
@@ -110,7 +111,7 @@ public class Retrieve implements ITaskAction {
                 throw new RuntimeException("Bag is invalid");
             }
 
-            copyExtractedFilesToTargetRetrieveArea(task, retrieveDetais, userStorage, bagDir);
+            copyExtractedFilesToUserArea(task, retrieveDetails, userStore, bagDir);
             
             // Cleanup
             logger.info("Cleaning up ...");
@@ -119,19 +120,19 @@ public class Retrieve implements ITaskAction {
             	tarTempFile.delete();
             }
             
-            logger.info("Data retrieve complete: " + retrieveDetais.getRetrievePath());
-            eventStream.send(new RetrieveComplete(task.getJobID(), retrieveDetais.getDepositId(), retrieveDetais.getRetrieveId()).withNextState(4)
-                .withUserId(retrieveDetais.getUserID()));
+            logger.info("Data retrieve complete: " + retrieveDetails.getRetrievePath());
+            eventStream.send(new RetrieveComplete(task.getJobID(), retrieveDetails.getDepositId(), retrieveDetails.getRetrieveId()).withNextState(4)
+                .withUserId(retrieveDetails.getUserID()));
             
         } catch (Exception e) {
-            String errMsg = "Data retrieve failed -  " + e.getMessage();
+            String errMsg = "Retrieve failed -  " + e.getMessage();
             throw new RetrieveException(errMsg, e);
         }
     }
 
 
-	private void copyExtractedFilesToTargetRetrieveArea(Task task, RetrieveDetails retrieveDetais,
-			UserStorage userStorage, File bagDir) throws Exception, InterruptedException {
+	private void copyExtractedFilesToUserArea(Task task, RetrieveDetails retrieveDetais,
+			UserStore userStore, File bagDir) throws Exception, InterruptedException {
 		// Copy the extracted files to the target retrieve area
 		
 		logger.info("Copying to user directory ...");
@@ -150,7 +151,7 @@ public class Retrieve implements ITaskAction {
 		
 		try {
 		    // Ask the driver to copy files to the user directory
-			userStorage.getUserFs().store(retrieveDetais.getRetrievePath(), bagDir, progress);
+			userStore.store(retrieveDetais.getRetrievePath(), bagDir, progress);
 		} finally {
 		    // Stop the tracking thread
 		    tracker.stop();
@@ -182,7 +183,7 @@ public class Retrieve implements ITaskAction {
 	}
 
 
-	private void copyFilesToTempDirectory(Task task, RetrieveDetails retrieveDetais, Device archiveFs, File tarTempFile)
+	private void copyArchivedFilesToTempDirectory(Task task, RetrieveDetails retrieveDetais, ArchiveStore archiveStore, File tarTempFile)
 			throws Exception, InterruptedException {
 		
         eventStream.send(new UpdateProgress(task.getJobID(), retrieveDetais.getDepositId(), 0, retrieveDetais.getArchiveSize(), "Starting transfer ...")
@@ -197,7 +198,7 @@ public class Retrieve implements ITaskAction {
 
 		try {
 		    // Ask the driver to copy files to the temp directory
-		    archiveFs.retrieve(retrieveDetais.getArchiveId(), tarTempFile, progress);
+			archiveStore.retrieve(retrieveDetais.getArchiveId(), tarTempFile, progress);
 		} finally {
 		    // Stop the tracking thread
 		    tracker.stop();
@@ -208,13 +209,13 @@ public class Retrieve implements ITaskAction {
 	}
 
 
-	private void validateEnoughFreeSpace(Task task, RetrieveDetails retrieveDetais, UserStorage userStorage)
+	private void validateEnoughFreeSpace(Task task, RetrieveDetails retrieveDetais, UserStore userStore)
 			throws RetrieveException {
 		// Check that there's enough free space ...
 		long freespace = 0;
 		boolean isFreeSpaceUndetermined = false;
 		try {
-		    freespace = userStorage.getUserFs().getUsableSpace();
+		    freespace = userStore.getUsableSpace();
 		    logger.info("Free space: " + freespace + " bytes (" +  FileUtils.byteCountToDisplaySize(freespace) + ")");
 
 		} catch (RuntimeException e) {
@@ -233,11 +234,11 @@ public class Retrieve implements ITaskAction {
 	}
 
 
-	private void validateTargetDirectory(RetrieveDetails retrieveDetais, UserStorage userStorage)
+	private void validateTargetDirectory(RetrieveDetails retrieveDetais, UserStore userStore)
 			throws RetrieveException {
 
-		if (!userStorage.getUserStore().exists(retrieveDetais.getRetrievePath())
-				|| !userStorage.getUserStore().isDirectory(retrieveDetais.getRetrievePath())) {
+		if (!userStore.exists(retrieveDetais.getRetrievePath())
+				|| !userStore.isDirectory(retrieveDetais.getRetrievePath())) {
 			// Target path must exist and be a directory
 			String errMsg = "Target directory not found!";
 			throw new RetrieveException(errMsg);
@@ -246,37 +247,18 @@ public class Retrieve implements ITaskAction {
 	}
 
 
-	private UserStorage connectToUserStorage(Task task) throws RetrieveException {
+	private UserStore getUserStorage(FileStore userFileStore) {
 		
 		// Connect to the user storage
-        try {
-            Class<?> clazz = Class.forName(task.getUserFileStore().getStorageClass());
-            Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
-            Object instance = constructor.newInstance(task.getUserFileStore().getStorageClass(), task.getUserFileStore().getProperties());
-            Device userFs = (Device) instance;
-            UserStore userStore = (UserStore) userFs;
-            return new UserStorage(userFs, userStore);
-            
-        } catch (Exception e) {
-            String errMsg = "Retrieve failed: could not access active filesystem";
-			throw new RetrieveException(errMsg);
-        }
+		//return getUserStorage(userFileStore);
+		return storageFactory.getUserStore(userFileStore.getStorageClass(), userFileStore.getStorageClass(), userFileStore.getProperties());
 	}
 
-	private Device connectToArchiveStorage(Task task) throws RetrieveException {
+	private ArchiveStore getArchiveStorage(org.datavaultplatform.common.model.ArchiveStore archiveStoreModel) {
 		
-		// Connect to the archive storage
-		Device archiveFs = null;
-        try {
-            Class<?> clazz = Class.forName(task.getArchiveFileStore().getStorageClass());
-            Constructor<?> constructor = clazz.getConstructor(String.class, Map.class);
-            Object instance = constructor.newInstance(task.getArchiveFileStore().getStorageClass(), task.getArchiveFileStore().getProperties());
-            archiveFs = (Device)instance;
-        } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-            String errMsg = "Retrieve failed: could not access archive filesystem";
-            throw new RetrieveException(errMsg, e);
-		}
-		return archiveFs;
+//		// Connect to the archive storage
+//		return storageFactory.getArchiveStorage(archiveStoreModel);
+		return storageFactory.getArchiveStorage(archiveStoreModel.getStorageClass(), archiveStoreModel.getStorageClass(), archiveStoreModel.getProperties());
 	}
 	
 	private void stopProcessingIfRedeliver(Task task) throws RetrieveException {

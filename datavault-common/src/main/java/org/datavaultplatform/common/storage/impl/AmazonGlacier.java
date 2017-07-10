@@ -43,7 +43,7 @@ public class AmazonGlacier extends Device implements ArchiveStore {
     private final AmazonSNSClient snsClient;
     private final ArchiveTransferManager transferManager;
     
-    public AmazonGlacier(String name, Map<String,String> config) throws Exception  {
+    public AmazonGlacier(String name, Map<String,String> config)  {
         super(name, config);
         
         // Unpack the config parameters (in an implementation-specific way)

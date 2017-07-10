@@ -1,25 +1,27 @@
 package org.datavaultplatform.worker.model;
 
 import org.datavaultplatform.common.storage.ArchiveStore;
+import org.datavaultplatform.common.storage.UserStore;
 
 public class Storage {
 	
-	private final UserStorage userStorage;
-	private final ArchiveStore archiveFs;
+	private final UserStore userStore;
+	private final ArchiveStore archiveStore;
 	
-	public Storage(UserStorage userStorage, ArchiveStore archiveFs) {
+	public Storage(UserStore userStore, ArchiveStore archiveStore) {
 		super();
-		this.userStorage = userStorage;
-		this.archiveFs = archiveFs;
+		this.userStore = userStore;
+		this.archiveStore = archiveStore;
 	}
 
-	public UserStorage getUserStorage() {
-		return userStorage;
+	public UserStore getUserStore() {
+		return userStore;
 	}
 
-	public ArchiveStore getArchiveFs() {
-		return archiveFs;
+	public ArchiveStore getArchiveStore() {
+		return archiveStore;
 	}
+
 	
 }
 
