@@ -23,9 +23,9 @@ import org.datavaultplatform.worker.exception.RetrieveException;
 import org.datavaultplatform.worker.model.RetrieveDetails;
 import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.ProgressTracker;
-import org.datavaultplatform.worker.operations.Tar;
 import org.datavaultplatform.worker.util.CheckSumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
+import org.datavaultplatform.worker.util.TarUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,7 +104,7 @@ public class Retrieve implements ITaskAction {
             validateTarChecksum(task, retrieveDetails, tarTempFile);
             
             // Decompress to the temporary directory
-            File bagDir = Tar.unTar(tarTempFile, context.getTempDir());
+            File bagDir = TarUtil.unTar(tarTempFile, context.getTempDir());
 
             // Validate the bagit directory
             if (!packager.validateBag(bagDir.toPath())) {

@@ -118,7 +118,7 @@ public class BagitPackager implements IPackager {
         
         File metadataFile = metadataDirPath.resolve(metadataFileName).toFile();
         FileUtils.writeStringToFile(metadataFile, metadata);
-        String hash = CheckSumUtil.computeFileHash(metadataFile, alg);
+        String hash = CheckSumUtil.generateCheckSum(metadataFile, alg);
         FileUtils.writeStringToFile(tagManifest, hash + "  " + metadataDirName + "/" + metadataFileName + "\r\n", true);
     }
     

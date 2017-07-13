@@ -34,10 +34,10 @@ import org.datavaultplatform.worker.model.Storage;
 import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.Identifier;
 import org.datavaultplatform.worker.operations.ProgressTracker;
-import org.datavaultplatform.worker.operations.Tar;
 import org.datavaultplatform.worker.util.CheckSumUtil;
 import org.datavaultplatform.worker.util.DataVaultConstants;
 import org.datavaultplatform.worker.util.FileUtil;
+import org.datavaultplatform.worker.util.TarUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -176,7 +176,7 @@ public class Deposit implements ITaskAction {
 		File tarFile = tempDirectory.resolve(tarFileName).toFile();
 		logger.debug("Creating tar file: {}", tarFile.getAbsolutePath());
 
-		Tar.createTar(tempBagPath.toFile(), tarFile);
+		TarUtil.createTar(tempBagPath.toFile(), tarFile);
 		return tarFile;
 	}
 
@@ -413,7 +413,7 @@ public class Deposit implements ITaskAction {
 		}
 
 		// Decompress to the temporary directory
-		File bagDir = Tar.unTar(tarFile, tempPath);
+		File bagDir = TarUtil.unTar(tarFile, tempPath);
 
 		// Validate the bagit directory
 		if (!packager.validateBag(bagDir.toPath())) {
