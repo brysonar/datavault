@@ -19,13 +19,13 @@ import org.datavaultplatform.common.storage.StorageFactory;
 import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.task.Context;
 import org.datavaultplatform.common.task.Task;
+import org.datavaultplatform.common.util.DataVaultConstants;
+import org.datavaultplatform.common.util.TarUtil;
 import org.datavaultplatform.worker.exception.RetrieveException;
 import org.datavaultplatform.worker.model.RetrieveDetails;
 import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.ProgressTracker;
 import org.datavaultplatform.worker.util.CheckSumUtil;
-import org.datavaultplatform.worker.util.DataVaultConstants;
-import org.datavaultplatform.worker.util.TarUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -151,7 +151,7 @@ public class Retrieve implements ITaskAction {
 		
 		try {
 		    // Ask the driver to copy files to the user directory
-			userStore.store(retrieveDetais.getRetrievePath(), bagDir, progress);
+			userStore.storeToUser(retrieveDetais.getRetrievePath(), bagDir, progress);
 		} finally {
 		    // Stop the tracking thread
 		    tracker.stop();
@@ -198,7 +198,7 @@ public class Retrieve implements ITaskAction {
 
 		try {
 		    // Ask the driver to copy files to the temp directory
-			archiveStore.retrieve(retrieveDetais.getArchiveId(), tarTempFile, progress);
+			archiveStore.retrieveFromArchive(retrieveDetais.getArchiveId(), tarTempFile, progress);
 		} finally {
 		    // Stop the tracking thread
 		    tracker.stop();

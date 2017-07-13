@@ -1,6 +1,7 @@
 package org.datavaultplatform.common.storage.impl;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.Map;
 
 import org.datavaultplatform.common.exception.DataVaultException;
@@ -34,6 +35,11 @@ public class OracleCloudSystem extends Device implements ArchiveStore {
 	}
 
 
+	@Override
+	public boolean isEncryptionEnabled() {
+		return true;
+	}
+	
 	private FileTransferAuth buildFileTransferAuth() {
 		
 //		FileTransferAuth auth = new FileTransferAuth(
@@ -66,7 +72,7 @@ public class OracleCloudSystem extends Device implements ArchiveStore {
 	}
 	
 	@Override
-	public String store(String destination, File srcFile, Progress progress) {
+	public String storeToArchive(String destination, File srcFile, Progress progress) {
 
 		String containerName = "container_name";
 		boolean isAsync = true;
@@ -221,7 +227,7 @@ public class OracleCloudSystem extends Device implements ArchiveStore {
 	//https://docs.oracle.com/en/cloud/iaas/storage-cloud/cssto/accessing-oracle-storage-cloud-service.html#GUID-B431E096-06B5-4FB5-B429-8CE95585BB25
 	
 	@Override
-	public void retrieve(String srcFileDirectoryName, File destination, Progress progress) {
+	public void retrieveFromArchive(String srcFileDirectoryName, File destination, Progress progress) {
 
 		String containerName = "ftmapi-demo";
 		String objectName = "fmtest.txt";

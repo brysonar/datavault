@@ -26,6 +26,8 @@ import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.storage.VerifyMethod;
 import org.datavaultplatform.common.task.Context;
 import org.datavaultplatform.common.task.Task;
+import org.datavaultplatform.common.util.DataVaultConstants;
+import org.datavaultplatform.common.util.TarUtil;
 import org.datavaultplatform.worker.exception.DataVaultWorkerException;
 import org.datavaultplatform.worker.exception.DepositException;
 import org.datavaultplatform.worker.model.DepositDetails;
@@ -35,9 +37,7 @@ import org.datavaultplatform.worker.operations.IPackager;
 import org.datavaultplatform.worker.operations.Identifier;
 import org.datavaultplatform.worker.operations.ProgressTracker;
 import org.datavaultplatform.worker.util.CheckSumUtil;
-import org.datavaultplatform.worker.util.DataVaultConstants;
 import org.datavaultplatform.worker.util.FileUtil;
-import org.datavaultplatform.worker.util.TarUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -237,18 +237,17 @@ public class Deposit implements ITaskAction {
 	}
 
 	private void verifyArchive(Context context, Storage storage, File tarFile, String tarHash, String archiveId) {
-		logger.info("Verifying archive package ...");
+		logger.info("Verifying archive package: {}", tarFile.getAbsolutePath());
 
-		ArchiveStore archiveFs = storage.getArchiveStore();
+		ArchiveStore archiveStore = storage.getArchiveStore();
 
-		logger.info("Verification method: " + archiveFs.getVerifyMethod());
-
-		if (archiveFs.getVerifyMethod() == VerifyMethod.LOCAL_ONLY) {
+		logger.info("Verification method: " + archiveStore.getVerifyMethod());
+		if (archiveStore.getVerifyMethod() == VerifyMethod.LOCAL_ONLY) {
 
 			// Verify the contents of the temporary file
 			verifyTarFile(context.getTempDir(), tarFile, null);
 
-		} else if (archiveFs.getVerifyMethod() == VerifyMethod.COPY_BACK) {
+		} else if (archiveStore.getVerifyMethod() == VerifyMethod.COPY_BACK) {
 
 			// Delete the existing temporary file
 			if (tarFile.exists()) {
@@ -256,6 +255,14 @@ public class Deposit implements ITaskAction {
 				tarFile.delete();
 			}
 
+			if (archiveStore.isEncryptionEnabled()) {
+				//delete encrypted file from temp 
+				File encryptedFile = tarFile.getParentFile().toPath().resolve(tarFile.getName() + DataVaultConstants.ENCRYPT_SUFFIX).toFile();
+				if (encryptedFile.exists()) {
+					encryptedFile.delete();
+				}
+			}
+			
 			// Copy file back from the archive storage
 			copyBackFromArchive(storage.getArchiveStore(), archiveId, tarFile);
 
@@ -341,7 +348,7 @@ public class Deposit implements ITaskAction {
 
 			try {
 				// Ask the driver to copy files to our working directory
-				userStore.retrieve(depositDetails.getFilePath(), outputFile, progress);
+				userStore.retrieveFromUserStore(depositDetails.getFilePath(), outputFile, progress);
 			} finally {
 				// Stop the tracking thread
 				tracker.stop();
@@ -355,7 +362,7 @@ public class Deposit implements ITaskAction {
 	private String copyTarToArchiveStorage(ArchiveStore archiveStore, DepositDetails depositDetails, File tarFile) {
 
 		// Copy the resulting tar file to the archive area
-		logger.info("Copying tar file to archive ...");
+		logger.info("Copying tar file to archive: {}", tarFile.getAbsolutePath());
 
 		// Progress tracking (threaded)
 		Progress progress = new Progress();
@@ -368,7 +375,7 @@ public class Deposit implements ITaskAction {
 
 		try {
 			try {
-				archiveId = archiveStore.store("/", tarFile, progress);
+				archiveId = archiveStore.storeToArchive("/", tarFile, progress);
 			} finally {
 				// Stop the tracking thread
 				tracker.stop();
@@ -384,13 +391,13 @@ public class Deposit implements ITaskAction {
 		return archiveId;
 	}
 
-	private void copyBackFromArchive(ArchiveStore archiveStore, String archiveId, File tarFile) {
+	private void copyBackFromArchive(ArchiveStore archiveStore, String archiveId, File file) {
 
 		// Ask the driver to copy files to the temp directory
 		Progress progress = new Progress();
 
 		try {
-			archiveStore.retrieve(archiveId, tarFile, progress);
+			archiveStore.retrieveFromArchive(archiveId, file, progress);
 		} catch (Exception e) {
 			throw new DataVaultWorkerException(e.getMessage(), e);
 		}

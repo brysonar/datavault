@@ -1,9 +1,10 @@
-package org.datavaultplatform.worker.util;
+package org.datavaultplatform.common.util;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.datavaultplatform.common.util.EncryptionApacheUtil;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;

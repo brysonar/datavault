@@ -1,4 +1,4 @@
-package org.datavaultplatform.worker.util;
+package org.datavaultplatform.common.util;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -11,7 +11,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 
-import org.datavaultplatform.worker.exception.DataVaultWorkerException;
+import org.datavaultplatform.common.exception.DataVaultException;
 
 import oracle.cloudstorage.api.cipher.CryptoUtils;
 import oracle.cloudstorage.api.cipher.CryptoUtils.DigestInputStream;
@@ -71,7 +71,7 @@ public class EncryptionOracleUtil {
 			}
 
 		} catch (IOException | GeneralSecurityException e) {
-			throw new DataVaultWorkerException("Error encrypting/decrypting file", e);
+			throw new DataVaultException("Error encrypting/decrypting file", e);
 		}
 	}
     
@@ -118,7 +118,7 @@ public class EncryptionOracleUtil {
 			}
 
 		} catch (IOException | GeneralSecurityException e) {
-			throw new DataVaultWorkerException("Error encrypting/decrypting file", e);
+			throw new DataVaultException("Error encrypting/decrypting file", e);
 		}
 	}
 

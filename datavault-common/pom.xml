@@ -101,6 +101,34 @@
 		<scope>test</scope>
 	</dependency>
 
+	<dependency>
+		<groupId>org.apache.commons</groupId>
+		<artifactId>commons-compress</artifactId>
+		<version>1.8</version>
+	</dependency>
+
+	<dependency>
+		<groupId>org.apache.commons</groupId>
+		<artifactId>commons-crypto</artifactId>
+		<version>1.0.0</version>
+	</dependency>
+
+<!-- 
+	<dependency>
+		<groupId>org.bouncycastle</groupId>
+		<artifactId>bcprov-jdk15on</artifactId>
+		<version>1.57</version>
+	</dependency>
+ -->
+ 
+ <!-- 
+ <dependency>
+    <groupId>com.github.martinwithaar</groupId>
+    <artifactId>encryptor4j</artifactId>
+    <version>0.1</version>
+</dependency>
+  -->
+  
 	<!-- oracle cloud file store sdk -->
 	<dependency>
 		<groupId>com.sun.jersey</groupId>

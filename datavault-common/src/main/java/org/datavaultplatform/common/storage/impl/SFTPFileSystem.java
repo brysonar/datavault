@@ -2,6 +2,7 @@ package org.datavaultplatform.common.storage.impl;
 
 import java.io.File;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -280,7 +281,7 @@ public class SFTPFileSystem extends Device implements UserStore {
     }
 
     @Override
-    public void retrieve(String path, File working, Progress progress) {
+    public void retrieveFromUserStore(String path, File working, Progress progress) {
         
         // Strip any leading separators (we want a path relative to the current dir)
         while (path.startsWith(PATH_SEPARATOR)) {
@@ -309,7 +310,7 @@ public class SFTPFileSystem extends Device implements UserStore {
     }
     
     @Override
-    public String store(String path, File working, Progress progress) {
+    public String storeToUser(String path, File working, Progress progress) {
         
         // Strip any leading separators (we want a path relative to the current dir)
         while (path.startsWith(PATH_SEPARATOR)) {

@@ -1,4 +1,4 @@
-package org.datavaultplatform.worker.util;
+package org.datavaultplatform.common.util;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;

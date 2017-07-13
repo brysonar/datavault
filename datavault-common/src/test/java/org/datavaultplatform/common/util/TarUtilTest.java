@@ -1,8 +1,9 @@
-package org.datavaultplatform.worker.util;
+package org.datavaultplatform.common.util;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.datavaultplatform.common.util.TarUtil;
 import org.junit.Ignore;
 import org.junit.Test;
 

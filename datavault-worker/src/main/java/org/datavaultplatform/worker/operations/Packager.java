@@ -13,9 +13,9 @@ import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.storage.CheckSumEnum;
+import org.datavaultplatform.common.util.DataVaultConstants;
 import org.datavaultplatform.worker.model.FileDetails;
 import org.datavaultplatform.worker.util.CheckSumUtil;
-import org.datavaultplatform.worker.util.DataVaultConstants;
 import org.datavaultplatform.worker.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

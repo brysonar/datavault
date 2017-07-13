@@ -42,12 +42,6 @@
         </dependency>
 
         <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-compress</artifactId>
-            <version>1.8</version>
-        </dependency>
-
-        <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
             <version>2.4</version>
@@ -108,28 +102,7 @@
 </dependency>
  -->
  
- 	<dependency>
-		<groupId>org.apache.commons</groupId>
-		<artifactId>commons-crypto</artifactId>
-		<version>1.0.0</version>
-	</dependency>
 
-<!-- 
-	<dependency>
-		<groupId>org.bouncycastle</groupId>
-		<artifactId>bcprov-jdk15on</artifactId>
-		<version>1.57</version>
-	</dependency>
- -->
- 
- <!-- 
- <dependency>
-    <groupId>com.github.martinwithaar</groupId>
-    <artifactId>encryptor4j</artifactId>
-    <version>0.1</version>
-</dependency>
-  -->
-	 
     </dependencies>
 
     <build>

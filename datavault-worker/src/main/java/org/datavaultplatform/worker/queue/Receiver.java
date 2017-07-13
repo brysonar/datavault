@@ -5,9 +5,9 @@ import java.nio.file.Paths;
 
 import org.datavaultplatform.common.task.Context;
 import org.datavaultplatform.common.task.Task;
+import org.datavaultplatform.common.util.DataVaultConstants;
 import org.datavaultplatform.worker.WorkerInstance;
 import org.datavaultplatform.worker.tasks.ITaskAction;
-import org.datavaultplatform.worker.util.DataVaultConstants;
 import org.datavaultplatform.worker.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

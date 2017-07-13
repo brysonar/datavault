@@ -1,4 +1,4 @@
-package org.datavaultplatform.worker.util;
+package org.datavaultplatform.common.util;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,7 +21,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.datavaultplatform.worker.exception.DataVaultWorkerException;
+import org.datavaultplatform.common.exception.DataVaultException;
 
 //http://www.codejava.net/coding/file-encryption-and-decryption-simple-example
 public class EncryptionCryptoUtil {
@@ -59,7 +59,7 @@ public class EncryptionCryptoUtil {
 			}
 
 		} catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException | IOException ex) {
-			throw new DataVaultWorkerException("Error encrypting/decrypting file", ex);
+			throw new DataVaultException("Error encrypting/decrypting file", ex);
 		}
 
 	}
@@ -88,7 +88,7 @@ public class EncryptionCryptoUtil {
         } catch (NoSuchPaddingException | NoSuchAlgorithmException
                 | InvalidKeyException | BadPaddingException
                 | IllegalBlockSizeException | IOException ex) {
-            throw new DataVaultWorkerException("Error encrypting/decrypting file", ex);
+            throw new DataVaultException("Error encrypting/decrypting file", ex);
         }
     }
     
@@ -103,7 +103,7 @@ public class EncryptionCryptoUtil {
 			key = Arrays.copyOf(key, 16);
 			return new SecretKeySpec(key, "AES");
 		} catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
-			throw new DataVaultWorkerException(e);
+			throw new DataVaultException(e);
 		} 
 	}
 
@@ -124,7 +124,7 @@ public class EncryptionCryptoUtil {
 			}
 			return bytes;
 		} catch (Exception e) {
-			throw new DataVaultWorkerException("Error while encrypting: " + e.getMessage(), e);
+			throw new DataVaultException("Error while encrypting: " + e.getMessage(), e);
 		}
 	}
 
@@ -150,7 +150,7 @@ public class EncryptionCryptoUtil {
 
 			return new String(bytes);
 		} catch (Exception e) {
-			throw new DataVaultWorkerException("Error while decrypting: " + e.getMessage(), e);
+			throw new DataVaultException("Error while decrypting: " + e.getMessage(), e);
 		}
 	}
 }

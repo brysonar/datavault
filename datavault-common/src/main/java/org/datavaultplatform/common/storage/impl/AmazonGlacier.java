@@ -1,6 +1,7 @@
 package org.datavaultplatform.common.storage.impl;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.Map;
 
 import org.datavaultplatform.common.io.Progress;
@@ -79,6 +80,11 @@ public class AmazonGlacier extends Device implements ArchiveStore {
         */
     }
     
+	@Override
+	public boolean isEncryptionEnabled() {
+		return false;
+	}
+	
     private ProgressListener initProgressListener(final Progress progress, final boolean trackResponse) {
 
         ProgressListener listener = new ProgressListener() {
@@ -154,15 +160,14 @@ public class AmazonGlacier extends Device implements ArchiveStore {
     }
     
     @Override
-    public void retrieve(String path, File working, Progress progress) throws Exception {
+    public void retrieveFromArchive(String path, File working, Progress progress) throws Exception {
         
         ProgressListener listener = initProgressListener(progress, true);
-        
         transferManager.download(DEFAULT_ACCOUNT_NAME, glacierVault, path, working, listener);
     }
 
     @Override
-    public String store(String path, File working, Progress progress) throws Exception {
+    public String storeToArchive(String path, File working, Progress progress) throws Exception {
         
         ProgressListener listener = initProgressListener(progress, false);
         

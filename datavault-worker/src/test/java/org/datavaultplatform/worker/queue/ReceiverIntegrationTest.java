@@ -65,14 +65,16 @@ public class ReceiverIntegrationTest {
 	public void testDeposit() throws IOException {
 
 		delete(getArchivedTarFile());
+		delete(getArchivedEncryptedTarFile());
 		delete(getMetaDataDirectory());
 
 		receiver.process(depositMessage, isRedeliver);
 
-		Assert.assertTrue(getArchivedTarFile().toFile().exists());
+		Assert.assertTrue(getArchivedEncryptedTarFile().toFile().exists());
 		Assert.assertTrue(getMetaDataDirectory().toFile().exists());
 
 		delete(getArchivedTarFile());
+		delete(getArchivedEncryptedTarFile());
 		delete(getMetaDataDirectory());
 	}
 
@@ -81,6 +83,7 @@ public class ReceiverIntegrationTest {
 
 		// set up data
 		delete(getArchivedTarFile());
+		delete(getArchivedEncryptedTarFile());
 		delete(getMetaDataDirectory());
 		delete(getRetrievedDirectory());
 
@@ -105,8 +108,9 @@ public class ReceiverIntegrationTest {
 		String receiveMessage = getReceiveMessage(tarFileCheckSum);
 		receiver.process(receiveMessage, isRedeliver);
 
-		delete(getArchivedTarFile());
-		delete(getMetaDataDirectory());
+//		delete(getArchivedTarFile());
+//		delete(getArchivedEncryptedTarFile());
+//		delete(getMetaDataDirectory());
 
 	}
 
@@ -120,6 +124,11 @@ public class ReceiverIntegrationTest {
 		return path;
 	}
 
+	private Path getArchivedEncryptedTarFile() {
+		Path path = Paths.get(ARCHIVE_FILE_STORE + "/" + bagId + ".tar.enc");
+		return path;
+	}
+	
 	private Path getMetaDataDirectory() {
 		Path path = Paths.get(metaDir + "/" + bagId);
 		return path;
