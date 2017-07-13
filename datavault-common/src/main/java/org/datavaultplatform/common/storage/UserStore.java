@@ -1,16 +1,15 @@
 package org.datavaultplatform.common.storage;
 
 import java.io.File;
-import java.nio.file.Path;
-
-// Interface for user facing storage systems
-
 import java.util.List;
-
 import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.model.FileInfo;
 
-
+/**
+ * 
+ * Interface for user facing storage systems
+ *
+ */
 public interface UserStore extends Storage {
     
     // Properties and methods relating to user storage

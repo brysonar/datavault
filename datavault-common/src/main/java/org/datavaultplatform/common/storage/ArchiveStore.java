@@ -1,11 +1,13 @@
 package org.datavaultplatform.common.storage;
 
 import java.io.File;
-
 import org.datavaultplatform.common.io.Progress;
 
-// Interface for back-end archive storage systems
-
+/**
+ * 
+ * Interface for back-end archive storage systems
+ *
+ */
 public interface ArchiveStore extends Storage {
     
     // Properties and methods relating to archive organisation and operation

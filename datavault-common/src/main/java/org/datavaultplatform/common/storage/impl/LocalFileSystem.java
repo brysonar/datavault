@@ -182,10 +182,10 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
 
 	private void validateFileExists(File file) {
 		if (!file.exists()) {
-			throw new DataVaultException("Archive file " + file.getAbsolutePath() + " not found");
+			throw new DataVaultException("File " + file.getAbsolutePath() + " not found");
 		}
 		if (!file.isFile()) {
-			throw new DataVaultException("Archive " + file.getAbsolutePath() +  "not a file");
+			throw new DataVaultException(file.getAbsolutePath() +  " is not a file");
 		}
 	}
 

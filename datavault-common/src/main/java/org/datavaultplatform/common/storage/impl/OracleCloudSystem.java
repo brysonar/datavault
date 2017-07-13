@@ -9,6 +9,8 @@ import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.storage.ArchiveStore;
 import org.datavaultplatform.common.storage.Device;
 import org.datavaultplatform.common.storage.VerifyMethod;
+import org.datavaultplatform.common.util.DataVaultConstants;
+import org.datavaultplatform.common.util.EncryptionCryptoUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +32,9 @@ public class OracleCloudSystem extends Device implements ArchiveStore {
 	
 	private static final Logger logger = LoggerFactory.getLogger(OracleCloudSystem.class);
 
+	private static final String CONTAINER_NAME = "container_name";
+	
+	
 	public OracleCloudSystem(String name, Map<String, String> config) {
 		super(name, config);
 	}
@@ -42,30 +47,12 @@ public class OracleCloudSystem extends Device implements ArchiveStore {
 	
 	private FileTransferAuth buildFileTransferAuth() {
 		
-//		FileTransferAuth auth = new FileTransferAuth(
-//				"john.doe@oracle.com", // user name
-//				"Welcome1!".toCharArray(), // password
-//				"storage", //  service name
-//				"https://storagedomain.storage.oraclecloud.com", // service URL
-//				"storagedomain" // identity domain
-//		);
-//		
-//		Properties prop = new Properties();
-//		
-//		FileTransferAuth auth2 = new FileTransferAuth(
-//				prop.getProperty("user-name"),
-//				prop.getProperty("password").toCharArray(),
-//				prop.getProperty("service-name"), 
-//				prop.getProperty("service-url"), 
-//				prop.getProperty("identity-domain")
-//				);
-		
 		FileTransferAuth auth3 = new FileTransferAuth(
-				config.get("user-name"),
-				config.get("password").toCharArray(),
-				config.get("service-name"), 
-				config.get("service-url"), 
-				config.get("identity-domain")
+				config.get("user-name"), // user name "john.doe@oracle.com"
+				config.get("password").toCharArray(), // password
+				config.get("service-name"), //  service name - storage
+				config.get("service-url"), // service URL - https://storagedomain.storage.oraclecloud.com
+				config.get("identity-domain") //"storagedomain"
 				);
 
 		return auth3;
@@ -74,11 +61,19 @@ public class OracleCloudSystem extends Device implements ArchiveStore {
 	@Override
 	public String storeToArchive(String destination, File srcFile, Progress progress) {
 
-		String containerName = "container_name";
-		boolean isAsync = true;
-		boolean isDirectory = false;
+		boolean isAsync = false;
+		boolean isDirectory = srcFile.isDirectory();
+
+		File fileToArchive = srcFile;
+		if (isEncryptionEnabled() && srcFile.isFile()) {
+    		Path directory = srcFile.getParentFile().toPath();
+        	File encryptedFile = directory.resolve(srcFile.getName() + DataVaultConstants.ENCRYPT_SUFFIX).toFile();
+        	logger.debug("encryptedFile: " + encryptedFile.getAbsolutePath());
+        	EncryptionCryptoUtil.encrypt(srcFile, encryptedFile);
+        	fileToArchive = encryptedFile;
+		}
 		
-		upload(containerName, srcFile, isDirectory, isAsync);
+		upload(CONTAINER_NAME, fileToArchive, isDirectory, isAsync);
 	    return srcFile.getName();
 	}
 	
@@ -142,116 +137,41 @@ public class OracleCloudSystem extends Device implements ArchiveStore {
 	}
 	
 
-
-	//http://www.oracle.com/webfolder/technetwork/tutorials/obe/cloud/objectstorage/upload_files_gt_5GB_FTM_API/upload_files_gt_5GB_FTM_API.html
-
-	
-//	 String containerName = "myContainer";
-//     File file = new File("sample_5MB.pdf");
-//     UploadConfig uploadConfig = new UploadConfig();
-//     uploadConfig.setOverwrite(true);
-//     uploadConfig.setStorageClass(CloudStorageClass.Standard);
-//     uploadConfig.setSegmentsContainer("myContainer-Segments");
-//     uploadConfig.setSegmentSize(1048576);
-     
-//	public class FileMd5Calculator{
-//	    public static String checkSum(String filepath);
-//	}
-	
-//	 FileMd5Calculator myMd5Calculator = new FileMd5Calculator();
-//     
-//     String originalFileMd5 = myMd5Calculator.checkSum(file.getAbsolutePath()); 
-//     String concatenatedFileMd5 = myMd5Calculator.checkSum(downloadfile.getAbsolutePath()); 
-//
-//     System.out.println("\nThe original file's MD5 is: " + originalFileMd5);
-//     System.out.println("The downloaded file's MD5 is: " + concatenatedFileMd5);
-     
-	
-//	private void testUpload() {
-//		System.out.println("Uploading file " + file.getName() + " to container " + containerName);
-//        TransferResult uploadResult = manager.upload(uploadConfig, containerName, null, file);
-//        System.out.println("Upload completed. Result:" + uploadResult.toString());
-//	}
-	
-	private void t() {
-		//AccountMetadata d = new AccountMetadata();
-		
-	
-		String restoreDirPath = "restoredfiles"; 
-		
-        File restoreDir = new File(restoreDirPath);
-        if (!restoreDir.isDirectory()) {
-            restoreDir.mkdir();
-        }
-        
-        String objectName = "sample_5MB.pdf";
-        File downloadfile = new File(restoreDirPath + File.separator + "concatenated-" + objectName);
-        DownloadConfig downloadConfig = new DownloadConfig();
-//        System.out.println("Downloading file " + downloadfile.getName() + " from container " + containerName);
-//        TransferResult downloadResult = manager.download(downloadConfig, containerName, objectName, downloadfile);
-//        System.out.println("Download completed. State:" + downloadResult.getState());
-	}
-	
-
-	//http://docs.oracle.com/en/cloud/iaas/storage-cloud/cssto/listing-containers.html
-	
-//	curl -v -X GET \
-//    -H "X-Auth-Token: token" \
-//    accountURL[?query_parameter=value]
-    		
-//	curl -v -X GET \
-//    -H "X-Auth-Token: AUTH_tkb4fdf39c92e9f62cca9b7c196f8b6e6b" \
-//    https://foo.storage.oraclecloud.com/v1/myservice-bar?limit=15
-    	
-	
-// http://www.oracle.com/webfolder/technetwork/tutorials/obe/cloud/objectstorage/upload_files_gt_5GB_REST_API/upload_files_gt_5GB_REST_API.html	
-//	curl -v -s -X GET -H "X-Storage-User: myService-myIdentityDomain:john.doe@oracle.com" -H "X-Storage-Pass: xUs8M8rw" https://foo.storage.oraclecloud.com/auth/v1.0
-	
-//	curl -v -X HEAD \
-//    -H "X-Auth-Token: AUTH_tkbaebb60dfa5b80d84e62b0d5d07031e5" 
-//https://foo.storage.oraclecloud.com/v1/Storage-myIdentityDomain/FirstContainer/myLargeFile
-	
-	
-//	curl -v -X GET \
-//    -H "X-Auth-Token: AUTH_tk5a58b7a8c34bb7b662523a59a5272650" 
-//    "https://foo.storage.oraclecloud.com/v1/Storage-myIdentityDomain/FirstContainer/myLargeFile" \
-//    -o ./myLargeFile1
-    
-    
-//	http://docs.oracle.com/en/cloud/iaas/storage-cloud/cssto/getting-container-metadata.html
-//	curl -v -X HEAD \
-//    -H "X-Auth-Token: AUTH_tkb4fdf39c92e9f62cca9b7c196f8b6e6b" \
-//    https://foo.storage.oraclecloud.com/v1/myservice-bar/FirstContainer		
-	
-	
-	//https://docs.oracle.com/en/cloud/iaas/storage-cloud/cssto/accessing-oracle-storage-cloud-service.html#GUID-B431E096-06B5-4FB5-B429-8CE95585BB25
-	
 	@Override
 	public void retrieveFromArchive(String srcFileDirectoryName, File destination, Progress progress) {
 
-		String containerName = "ftmapi-demo";
-		String objectName = "fmtest.txt";
-		String restoreDirPath = "restoredfiles";
-		download(containerName, objectName, restoreDirPath);
+		String objectName = null;
+
+		File retrievedFile = null;
+		
+		if (isEncryptionEnabled()) {
+			File archivedEncryptedFile = destination.toPath().getParent().resolve(destination.getName() + DataVaultConstants.ENCRYPT_SUFFIX).toFile();
+			objectName = archivedEncryptedFile.getName();
+			retrievedFile = archivedEncryptedFile;
+		} else {
+			 objectName = destination.getName();
+			 retrievedFile = destination;
+		}
+		
+		download(CONTAINER_NAME, objectName, retrievedFile);
+		
+		if (isEncryptionEnabled()) {
+    		validateFileExists(retrievedFile);
+        	EncryptionCryptoUtil.decrypt(retrievedFile, destination);
+        	retrievedFile.delete();
+		}
 	}
 	
-	private void download(final String containerName, final String objectName, final String restoreDirPath) {
+	private void download(final String containerName, final String objectName, final File destinationFile) {
 
 		FileTransferManager manager = null;
 		try {
 			manager = FileTransferManager.getDefaultFileTransferManager(buildFileTransferAuth());
-			// Create the restoreDirPath if required
-			File restoreDir = new File(restoreDirPath);
-			if (!restoreDir.isDirectory()) {
-				restoreDir.mkdir();
-			}
-
-			File file = new File(restoreDirPath + File.separator + objectName);
 			
 			DownloadConfig downloadConfig = new DownloadConfig();
 			
-			logger.info("Downloading file " + file.getName() + " from container " + containerName);
-			TransferResult uploadResult = manager.download(downloadConfig, containerName, objectName, file);
+			logger.info("Downloading file " + destinationFile.getName() + " from container " + containerName);
+			TransferResult uploadResult = manager.download(downloadConfig, containerName, objectName, destinationFile);
 			logger.info("Download completed. State:" + uploadResult.getState());
 			
 //			MultiFileTransferResult downloadResult = manager.downloadDirectory(downloadConfig, containerName, null, dir);
@@ -278,8 +198,104 @@ public class OracleCloudSystem extends Device implements ArchiveStore {
 		return null;
 	}
 	
+	//could put this in base class - NB this is for files system
+	private void validateFileExists(File file) {
+		if (!file.exists()) {
+			throw new DataVaultException("File " + file.getAbsolutePath() + " not found");
+		}
+		if (!file.isFile()) {
+			throw new DataVaultException(file.getAbsolutePath() +  " is not a file");
+		}
+	}
 	
 	
+	//############################################################################
+//	Notes
+	
+	
+	//http://www.oracle.com/webfolder/technetwork/tutorials/obe/cloud/objectstorage/upload_files_gt_5GB_FTM_API/upload_files_gt_5GB_FTM_API.html
+
+	
+//	 String containerName = "myContainer";
+//    File file = new File("sample_5MB.pdf");
+//    UploadConfig uploadConfig = new UploadConfig();
+//    uploadConfig.setOverwrite(true);
+//    uploadConfig.setStorageClass(CloudStorageClass.Standard);
+//    uploadConfig.setSegmentsContainer("myContainer-Segments");
+//    uploadConfig.setSegmentSize(1048576);
+    
+//	public class FileMd5Calculator{
+//	    public static String checkSum(String filepath);
+//	}
+	
+//	 FileMd5Calculator myMd5Calculator = new FileMd5Calculator();
+//    
+//    String originalFileMd5 = myMd5Calculator.checkSum(file.getAbsolutePath()); 
+//    String concatenatedFileMd5 = myMd5Calculator.checkSum(downloadfile.getAbsolutePath()); 
+//
+//    System.out.println("\nThe original file's MD5 is: " + originalFileMd5);
+//    System.out.println("The downloaded file's MD5 is: " + concatenatedFileMd5);
+    
+	
+//	private void testUpload() {
+//		System.out.println("Uploading file " + file.getName() + " to container " + containerName);
+//       TransferResult uploadResult = manager.upload(uploadConfig, containerName, null, file);
+//       System.out.println("Upload completed. Result:" + uploadResult.toString());
+//	}
+	
+	private void t() {
+		//AccountMetadata d = new AccountMetadata();
+		
+	
+		String restoreDirPath = "restoredfiles"; 
+		
+       File restoreDir = new File(restoreDirPath);
+       if (!restoreDir.isDirectory()) {
+           restoreDir.mkdir();
+       }
+       
+       String objectName = "sample_5MB.pdf";
+       File downloadfile = new File(restoreDirPath + File.separator + "concatenated-" + objectName);
+       DownloadConfig downloadConfig = new DownloadConfig();
+//       System.out.println("Downloading file " + downloadfile.getName() + " from container " + containerName);
+//       TransferResult downloadResult = manager.download(downloadConfig, containerName, objectName, downloadfile);
+//       System.out.println("Download completed. State:" + downloadResult.getState());
+	}
+	
+
+	//http://docs.oracle.com/en/cloud/iaas/storage-cloud/cssto/listing-containers.html
+	
+//	curl -v -X GET \
+//   -H "X-Auth-Token: token" \
+//   accountURL[?query_parameter=value]
+   		
+//	curl -v -X GET \
+//   -H "X-Auth-Token: AUTH_tkb4fdf39c92e9f62cca9b7c196f8b6e6b" \
+//   https://foo.storage.oraclecloud.com/v1/myservice-bar?limit=15
+   	
+	
+//http://www.oracle.com/webfolder/technetwork/tutorials/obe/cloud/objectstorage/upload_files_gt_5GB_REST_API/upload_files_gt_5GB_REST_API.html	
+//	curl -v -s -X GET -H "X-Storage-User: myService-myIdentityDomain:john.doe@oracle.com" -H "X-Storage-Pass: xUs8M8rw" https://foo.storage.oraclecloud.com/auth/v1.0
+	
+//	curl -v -X HEAD \
+//   -H "X-Auth-Token: AUTH_tkbaebb60dfa5b80d84e62b0d5d07031e5" 
+//https://foo.storage.oraclecloud.com/v1/Storage-myIdentityDomain/FirstContainer/myLargeFile
+	
+	
+//	curl -v -X GET \
+//   -H "X-Auth-Token: AUTH_tk5a58b7a8c34bb7b662523a59a5272650" 
+//   "https://foo.storage.oraclecloud.com/v1/Storage-myIdentityDomain/FirstContainer/myLargeFile" \
+//   -o ./myLargeFile1
+   
+   
+//	http://docs.oracle.com/en/cloud/iaas/storage-cloud/cssto/getting-container-metadata.html
+//	curl -v -X HEAD \
+//   -H "X-Auth-Token: AUTH_tkb4fdf39c92e9f62cca9b7c196f8b6e6b" \
+//   https://foo.storage.oraclecloud.com/v1/myservice-bar/FirstContainer		
+	
+	
+	//https://docs.oracle.com/en/cloud/iaas/storage-cloud/cssto/accessing-oracle-storage-cloud-service.html#GUID-B431E096-06B5-4FB5-B429-8CE95585BB25
+		
 	
 	
 //	public class UploadFileDemo {
