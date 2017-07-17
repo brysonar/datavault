@@ -108,9 +108,9 @@ public class ReceiverIntegrationTest {
 		String receiveMessage = getReceiveMessage(tarFileCheckSum);
 		receiver.process(receiveMessage, isRedeliver);
 
-//		delete(getArchivedTarFile());
-//		delete(getArchivedEncryptedTarFile());
-//		delete(getMetaDataDirectory());
+		delete(getArchivedTarFile());
+		delete(getArchivedEncryptedTarFile());
+		delete(getMetaDataDirectory());
 
 	}
 

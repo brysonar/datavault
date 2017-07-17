@@ -16,11 +16,11 @@ import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
 import org.datavaultplatform.common.exception.DataVaultException;
-import org.datavaultplatform.common.io.FileCopy;
 import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.model.FileInfo;
 import org.datavaultplatform.common.storage.Device;
 import org.datavaultplatform.common.storage.UserStore;
+import org.datavaultplatform.common.util.FileCopy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

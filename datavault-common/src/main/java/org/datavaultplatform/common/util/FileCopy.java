@@ -18,7 +18,7 @@
 /* Originally from Apache Commons IO 2.4
  * Modified version of FileUtils to add progress/error tracking to file copies.
  */
-package org.datavaultplatform.common.io;
+package org.datavaultplatform.common.util;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -31,17 +31,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
+import org.datavaultplatform.common.io.Progress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FileCopy {
+public final class FileCopy {
 
 	 private static final Logger logger = LoggerFactory.getLogger(FileCopy.class);
 	 
     /**
      * Instances should NOT be constructed in standard programming.
      */
-    public FileCopy() {
+    private FileCopy() {
         super();
     }
     

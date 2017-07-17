@@ -13,7 +13,6 @@ import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.datavaultplatform.common.exception.DataVaultException;
-import org.datavaultplatform.common.io.FileCopy;
 import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.model.FileInfo;
 import org.datavaultplatform.common.storage.ArchiveStore;
@@ -22,6 +21,7 @@ import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.storage.VerifyMethod;
 import org.datavaultplatform.common.util.DataVaultConstants;
 import org.datavaultplatform.common.util.EncryptionCryptoUtil;
+import org.datavaultplatform.common.util.FileCopy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
