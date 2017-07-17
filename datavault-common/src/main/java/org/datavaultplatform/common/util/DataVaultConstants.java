@@ -15,4 +15,7 @@ public class DataVaultConstants {
 	
 	public static final CheckSumEnum CHECKSUM_ENUM = CheckSumEnum.MD5;
 	public static final CheckSumEnum TAR_CHECKSUM_ENUM = CheckSumEnum.SHA1;
+	
+    public static final long ONE_KB = 1024;
+    
 }

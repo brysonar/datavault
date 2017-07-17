@@ -20,7 +20,7 @@ import org.datavaultplatform.common.io.Progress;
 import org.datavaultplatform.common.model.FileInfo;
 import org.datavaultplatform.common.storage.Device;
 import org.datavaultplatform.common.storage.UserStore;
-import org.datavaultplatform.common.util.FileCopy;
+import org.datavaultplatform.common.util.DataVaultConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +42,7 @@ public class DropboxFileSystem extends Device implements UserStore {
 
 	private final String dbxAppName = "DataVault/1.0";
 	private final String PATH_SEPARATOR = "/";
-	private static final long FILE_COPY_BUFFER_SIZE = FileCopy.ONE_KB * 64;
+	private static final long FILE_COPY_BUFFER_SIZE = DataVaultConstants.ONE_KB * 64;
 
 	private final DbxRequestConfig dbxConfig;
 	private final DbxClient dbxClient;
