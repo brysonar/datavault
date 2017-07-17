@@ -21,7 +21,7 @@ import org.datavaultplatform.common.storage.UserStore;
 import org.datavaultplatform.common.storage.VerifyMethod;
 import org.datavaultplatform.common.util.DataVaultConstants;
 import org.datavaultplatform.common.util.EncryptionCryptoUtil;
-import org.datavaultplatform.common.util.FileCopy;
+import org.datavaultplatform.common.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,14 +138,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
     	
         Path srcPath = getAbsolutePath(srcFileDirectoryName);
         File srcfile = srcPath.toFile();
-        
-        if (srcfile.isFile()) {
-        	logger.debug("Local File System retrieve - copying file: {}", srcPath);
-            copyFile(progress, srcfile, destination);
-        } else if (srcfile.isDirectory()) {
-        	logger.debug("Local File System retrieve - copying directory: {}", srcPath);
-            copyDirectory(progress, srcfile, destination);
-        }
+        copyDirectoryOrFile(progress, srcfile, destination);
     }
     
     @Override
@@ -159,7 +152,7 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
         if (archivefile.isDirectory()) {
         	
         	logger.debug("Local File System retrieve - copying directory: {}", archivePath);
-            copyDirectory(progress, archivefile, destination);
+            copyDirectoryOrFile(progress, archivefile, destination);
             
         } else {
         	logger.debug("Local File System retrieve - copying file: {}", archivePath);
@@ -168,14 +161,14 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
         		File archivedEncryptedFile = archivePath.getParent().resolve(destination.getName() + DataVaultConstants.ENCRYPT_SUFFIX).toFile();
         		validateFileExists(archivedEncryptedFile);
         		File destinationEncryptedFile = destination.getParentFile().toPath().resolve(destination.getName() + DataVaultConstants.ENCRYPT_SUFFIX).toFile();
-            	copyFile(progress, archivedEncryptedFile, destinationEncryptedFile);
+            	copyDirectoryOrFile(progress, archivedEncryptedFile, destinationEncryptedFile);
             	EncryptionCryptoUtil.decrypt(destinationEncryptedFile, destination);
             	
             	boolean result = destinationEncryptedFile.delete();
             	logger.debug("Deleted encrypted file {}: {}", destinationEncryptedFile, result);
         	} else {
         		validateFileExists(archivefile);
-        		copyFile(progress, archivefile, destination);
+        		copyDirectoryOrFile(progress, archivefile, destination);
         	}
         } 
     }
@@ -197,7 +190,6 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
         Path destinationPath = getAbsolutePath(destination);
 
         if (srcFile.isFile()) {
-        	
         	if (srcFile.getName().endsWith(DataVaultConstants.ENCRYPT_SUFFIX)) {
         		//decrypt file
         		String decryptedFileName = srcFile.getName().substring(0, srcFile.getName().length()-4);
@@ -205,67 +197,42 @@ public class LocalFileSystem extends Device implements UserStore, ArchiveStore {
         		File decryptedFile = srcFile.getParentFile().toPath().resolve(decryptedFileName).toFile();
         		EncryptionCryptoUtil.decrypt(srcFile, decryptedFile);
         	}
-        	copyFile(progress, srcFile, destinationPath);
-        } else if (srcFile.isDirectory()) {
-            copyDirectory(progress, srcFile, destinationPath);
-        }
+        } 
         
+        File destinationFile = destinationPath.resolve(srcFile.getName()).toFile();
+    	copyDirectoryOrFile(progress, srcFile, destinationFile);
         return srcFile.getName();
     }
     
     @Override
-    public String storeToArchive(String destination, File srcFile, Progress progress) {
+    public String storeToArchive(String destination, File source, Progress progress) {
     	
-    	logger.debug("Copy file from {} to Archive Store: {}", srcFile.getAbsolutePath(), destination);
+    	logger.debug("Copy file from {} to Archive Store: {}", source.getAbsolutePath(), destination);
 
         Path destinationPath = getAbsolutePath(destination);
 
-        if (srcFile.isFile()) {
-        	//encrypt
-        	
+        File fileToCopy = source;
+        
+        if (source.isFile()) {
         	if (isEncryptionEnabled()) {
-        		Path directory = srcFile.getParentFile().toPath();
-            	File encryptedFile = directory.resolve(srcFile.getName() + DataVaultConstants.ENCRYPT_SUFFIX).toFile();
+        		Path directory = source.getParentFile().toPath();
+            	File encryptedFile = directory.resolve(source.getName() + DataVaultConstants.ENCRYPT_SUFFIX).toFile();
             	logger.debug("encryptedFile: " + encryptedFile.getAbsolutePath());
-            	EncryptionCryptoUtil.encrypt(srcFile, encryptedFile);
-            	copyFile(progress, encryptedFile, destinationPath);
-        	} else {
-        		copyFile(progress, srcFile, destinationPath);
+            	EncryptionCryptoUtil.encrypt(source, encryptedFile);
+            	fileToCopy = encryptedFile;
         	}
-        } else if (srcFile.isDirectory()) {
-            copyDirectory(progress, srcFile, destinationPath);
         }
         
-        return srcFile.getName();
+    	File destinationFile = destinationPath.resolve(fileToCopy.getName()).toFile();
+    	copyDirectoryOrFile(progress, fileToCopy, destinationFile);
+    	
+        return source.getName();
     }
 
-
-	private void copyFile(Progress progress, File srcFile, Path destinationPath) {
-		File destinationFile = destinationPath.resolve(srcFile.getName()).toFile();
-		copyFile(progress, srcFile, destinationFile);
+	private void copyDirectoryOrFile(Progress progress, File srcFile, File destinationFile) {
+		FileUtil.copyDirectoryOrFile(progress, srcFile, destinationFile);
 	}
 
-	private void copyFile(Progress progress, File srcFile, File destinationFile) {
-		try {
-			FileCopy.copyFile(progress, srcFile, destinationFile);
-		} catch (IOException e) {
-			throw new DataVaultException("Failed to copy file " + srcFile.getAbsolutePath() + " - "  + e.getMessage(), e);
-		}
-	}
-
-	private void copyDirectory(Progress progress, File srcFile,  Path destinationPath) {
-		File destinationFile = destinationPath.resolve(srcFile.getName()).toFile();
-		copyDirectory(progress, srcFile, destinationFile);
-	}
-
-	private void copyDirectory(Progress progress, File srcFile, File destinationFile) {
-		try {
-			FileCopy.copyDirectory(progress, srcFile, destinationFile);
-		} catch (IOException e) {
-			throw new DataVaultException("Failed to copy directory " + srcFile.getAbsolutePath() + " - "  + e.getMessage(), e);
-		}
-	}
-    
     
     @Override
     public VerifyMethod getVerifyMethod() {

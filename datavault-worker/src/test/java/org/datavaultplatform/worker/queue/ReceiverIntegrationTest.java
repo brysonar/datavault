@@ -10,8 +10,6 @@ import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.test.context.ContextConfiguration;
@@ -22,8 +20,6 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 // @ContextConfiguration(classes = {AppConfig.class})
 @ContextConfiguration(locations = { "classpath:datavault-worker.xml" })
 public class ReceiverIntegrationTest {
-
-	private static final Logger logger = LoggerFactory.getLogger(ReceiverIntegrationTest.class);
 
 	private static final boolean isRedeliver = false;
 	private static final String bagId = "f8e65b18-756a-4b48-b26f-7b4eafa5c714";
@@ -111,6 +107,7 @@ public class ReceiverIntegrationTest {
 		delete(getArchivedTarFile());
 		delete(getArchivedEncryptedTarFile());
 		delete(getMetaDataDirectory());
+		delete(getRetrievedDirectory());
 
 	}
 

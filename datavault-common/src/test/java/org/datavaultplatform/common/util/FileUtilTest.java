@@ -4,12 +4,19 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import org.datavaultplatform.common.exception.DataVaultException;
+import org.datavaultplatform.common.io.Progress;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Ignore
 public class FileUtilTest {
 
+	private static final Logger logger = LoggerFactory.getLogger(FileUtil.class);
+	
+	final Progress progress = null;
+	
 	final Path source = Paths.get("/datavaultdump/myfiles");
 	final Path target = Paths.get("/datavaultdump2/myfiles2");
 	
@@ -21,9 +28,10 @@ public class FileUtilTest {
 	public void testDirectoryCopy() {
 
 		try {
-			FileUtil.copyFile(source, target);
+			FileUtil.copyDirectoryOrFile(progress, source, target);
 		} catch (DataVaultException e) {
-			System.err.println(e.getMessage());
+			logger.error(e.getMessage(), e);
+			throw e;
 		}
 	}
 
@@ -31,9 +39,10 @@ public class FileUtilTest {
 	public void testFileCopy() {
 
 		try {
-			FileUtil.copyFile(sourceFile, targetFile);
+			FileUtil.copyDirectoryOrFile(progress, sourceFile, targetFile);
 		} catch (DataVaultException e) {
-			System.err.println(e.getMessage());
+			logger.error(e.getMessage(), e);
+			throw e;
 		}
 	}
 	

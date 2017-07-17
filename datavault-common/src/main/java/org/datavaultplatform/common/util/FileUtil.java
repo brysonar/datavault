@@ -1,5 +1,6 @@
 package org.datavaultplatform.common.util;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
@@ -9,10 +10,14 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 
 import org.datavaultplatform.common.exception.DataVaultException;
+import org.datavaultplatform.common.io.Progress;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class FileUtil {
 
-	private static final String CANNOT_PERFORM_COPY_PREFIX = "Cannot perform copy - ";
+	private static final Logger logger = LoggerFactory.getLogger(FileUtil.class);
+	private static final String CANNOT_PERFORM_COPY_PREFIX = "Failed to perform copy ";
 	
 	private FileUtil() {
 		super();
@@ -25,13 +30,31 @@ public final class FileUtil {
 	 * @param target
 	 * @throws IOException 
 	 */
-	public static void copyFile(final Path source, final Path target) {
+	public static void copyDirectoryOrFile(final Progress progress, final File source, final File target) {
+
+		copyDirectoryOrFile(progress, source.toPath(), target.toPath());
+	}
+	
+	/**
+	 * Copy file or directory
+	 * 
+	 * @param source
+	 * @param target
+	 * @throws IOException 
+	 */
+	public static void copyDirectoryOrFile(final Progress progress, final Path source, final Path target) {
 
 		try {
+	        if (source.toFile().isFile()) {
+	        	logger.debug("Copying file: {}", source);
+	        } else if (source.toFile().isDirectory()) {
+	        	logger.debug("Copying directory: {}", source);
+	        }
+	        	
 			// Files.walkFileTree(source, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, vistor);
-			Files.walkFileTree(source, new CopyFileVisitor(source, target));
+			Files.walkFileTree(source, new CopyFileVisitor(source, target, progress));
 		} catch (Exception e) {
-			throw new DataVaultException(CANNOT_PERFORM_COPY_PREFIX + e.getMessage(), e);
+			throw new DataVaultException(CANNOT_PERFORM_COPY_PREFIX + " from " + source + " to " + target + " - " + e.getMessage(), e);
 		}
 	}
 	
@@ -39,21 +62,19 @@ public final class FileUtil {
 		
 		private final Path source;
 		private final Path target;
+		final Progress progress;
 		
-		public CopyFileVisitor(Path source, Path target) {
+		public CopyFileVisitor(Path source, Path target, Progress progress) {
 			this.target = target;
 			this.source = source;
+			this.progress = progress; 
 		}
 		
 		@Override
 		public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
 
 			Path targetdir = target.resolve(source.relativize(dir));
-			
-//			System.err.println("pre visit directory - source: " + source);
-//			System.err.println("pre visit directory - dir: " + dir);
-//			System.err.println("pre visit directory - targetdir: " + targetdir);
-			
+			logger.trace("Pre visit directory - source: " + source, ", dir: " + dir + ", targetdir: " + targetdir);
 			try {
 				Files.copy(dir, targetdir);
 			} catch (FileAlreadyExistsException e) {
@@ -67,7 +88,7 @@ public final class FileUtil {
 		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 						
 			if (!target.getParent().toFile().isDirectory()) {
-				throw new DataVaultException("Target directory " + target.getParent() + " does not exist");
+				throw new DataVaultException("target directory " + target.getParent() + " does not exist");
 			}
 			
 			try {
@@ -75,39 +96,14 @@ public final class FileUtil {
 			} catch (FileAlreadyExistsException e) {
 				throw new DataVaultException("file already exists: " + e.getMessage(), e);
 			}
+			
+			if (progress != null) {
+				progress.timestamp = System.currentTimeMillis();
+				progress.fileCount += 1;
+			}
+			
 			return FileVisitResult.CONTINUE;
 		}
 	}
 
-
-//	class CopyFileVisitor extends SimpleFileVisitor<Path> {
-//	
-//	private Path source = null;
-//	private final Path target;
-//	
-//
-//	public CopyFileVisitor(Path target) {
-//		this.target = target;
-//	}
-//
-//	@Override
-//	public FileVisitResult preVisitDirectory(final Path dir, final BasicFileAttributes attrs) throws IOException {
-//		
-//		System.err.println("pre visit directory - source: " + source);
-//		System.err.println("pre visit directory - dir: " + dir);
-//		
-//		if (source == null) {
-//			source = dir;
-//		} else {
-//			Files.createDirectories(target.resolve(source.relativize(dir)));
-//		}
-//		return FileVisitResult.CONTINUE;
-//	}
-//
-//	@Override
-//	public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) throws IOException {
-//		Files.copy(file, target.resolve(source.relativize(file)));
-//		return FileVisitResult.CONTINUE;
-//	}
-//}
 }
